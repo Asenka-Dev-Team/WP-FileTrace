@@ -555,9 +555,9 @@ final class WFT_Admin {
                     <div class="wft-logo-shell">
                         <img src="<?php echo esc_url( WFT_URL . 'assets/images/logo--wp-filetrace.svg' ); ?>" alt="<?php esc_attr_e( 'WP FileTrace', 'wp-filetrace' ); ?>">
                     </div>
-                    <div>
+                    <div class="wft-info-shell">
                         <h1><?php esc_html_e( 'WP FileTrace', 'wp-filetrace' ); ?></h1>
-                        <p><?php esc_html_e( 'Create tracked download links, monitor usage, and export download data.', 'wp-filetrace' ); ?></p>
+                        <p class="quip"><?php esc_html_e( 'Create tracked download links, monitor usage, and export download data.', 'wp-filetrace' ); ?></p>
                     </div>
                 </div>
                 <a class="wft-asenka-link" href="https://asenka.com/" target="_blank" rel="noopener noreferrer">Asenka.com ↗</a>
