@@ -1,6 +1,6 @@
 <?php
 /**
- * Asenka Download Tracker v0.1.0 uninstall handler.
+ * Asenka Download Tracker v0.1.1 uninstall handler.
  *
  * Permanently removes all plugin tracking data when the plugin is deleted
  * through WordPress.

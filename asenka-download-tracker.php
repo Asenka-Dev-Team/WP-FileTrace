@@ -3,7 +3,7 @@
  * Plugin Name: Asenka Download Tracker
  * Plugin URI: https://asenka.com/
  * Description: Track WordPress media and external file downloads through shortcodes and shareable tracked links.
- * Version: 0.1.0
+ * Version: 0.1.1
  * Author: Asenka Interactive
  * Author URI: https://asenka.com/
  * Text Domain: asenka-download-tracker
@@ -17,7 +17,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-define( 'ADT_VERSION', '0.1.0' );
+define( 'ADT_VERSION', '0.1.1' );
 define( 'ADT_FILE', __FILE__ );
 define( 'ADT_PATH', plugin_dir_path( __FILE__ ) );
 define( 'ADT_URL', plugin_dir_url( __FILE__ ) );

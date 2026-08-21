@@ -29,13 +29,14 @@ final class ADT_Export {
         }
 
         fwrite( $output, "\xEF\xBB\xBF" );
-        fputcsv( $output, array( 'Title', 'Media ID', 'URL', 'Total Downloads', 'Shortcode Downloads', 'External Downloads', 'Last Download', 'Created' ) );
+        fputcsv( $output, array( 'Title', 'Button Text', 'Media ID', 'URL', 'Total Downloads', 'Shortcode Downloads', 'External Downloads', 'Last Download', 'Created' ) );
 
         foreach ( $rows as $row ) {
             fputcsv(
                 $output,
                 array(
                     $row->title,
+                    isset( $row->button_text ) ? $row->button_text : 'Download',
                     $row->attachment_id,
                     $row->file_url,
                     $row->total_downloads,

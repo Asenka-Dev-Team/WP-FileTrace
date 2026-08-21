@@ -16,7 +16,7 @@ final class ADT_Downloads {
         return hash( 'sha256', $attachment_id > 0 ? 'attachment:' . $attachment_id : 'url:' . strtolower( $url ) );
     }
 
-    public static function get_or_create( int $attachment_id = 0, string $url = '', string $title = '' ) {
+    public static function get_or_create( int $attachment_id = 0, string $url = '', string $title = '', string $button_text = '' ) {
         global $wpdb;
 
         if ( $attachment_id > 0 ) {
@@ -40,6 +40,8 @@ final class ADT_Downloads {
             $title = $path ? wp_basename( $path ) : $url;
         }
 
+        $button_text = sanitize_text_field( trim( $button_text ) );
+
         $hash  = self::destination_hash( $attachment_id, $url );
         $table = ADT_DB::downloads_table();
 
@@ -48,6 +50,19 @@ final class ADT_Downloads {
         );
 
         if ( $existing ) {
+            if ( '' !== $button_text && ( ! isset( $existing->button_text ) || $button_text !== (string) $existing->button_text ) ) {
+                $wpdb->update(
+                    $table,
+                    array(
+                        'button_text' => $button_text,
+                        'updated_at'  => current_time( 'mysql' ),
+                    ),
+                    array( 'id' => (int) $existing->id ),
+                    array( '%s', '%s' ),
+                    array( '%d' )
+                );
+                $existing->button_text = $button_text;
+            }
             return $existing;
         }
 
@@ -62,10 +77,11 @@ final class ADT_Downloads {
                 'file_url'         => $url,
                 'destination_hash' => $hash,
                 'title'            => sanitize_text_field( $title ),
+                'button_text'      => '' !== $button_text ? $button_text : __( 'Download', 'asenka-download-tracker' ),
                 'created_at'       => $now,
                 'updated_at'       => $now,
             ),
-            array( '%s', '%d', '%s', '%s', '%s', '%s', '%s' )
+            array( '%s', '%d', '%s', '%s', '%s', '%s', '%s', '%s' )
         );
 
         if ( false === $inserted ) {
@@ -102,10 +118,69 @@ final class ADT_Downloads {
     public static function get_all(): array {
         global $wpdb;
         $table = ADT_DB::downloads_table();
-        return $wpdb->get_results( "SELECT * FROM {$table} ORDER BY created_at DESC" ) ?: array();
+        return $wpdb->get_results( "SELECT * FROM {$table} ORDER BY created_at DESC, id DESC" ) ?: array();
     }
 
-    public static function update_tracker( int $id, string $title, string $url, int $attachment_id = 0 ): bool {
+    public static function get_count(): int {
+        global $wpdb;
+        $table = ADT_DB::downloads_table();
+        return (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$table}" );
+    }
+
+    public static function get_created_desc_page_for_id( int $id, int $per_page = 20 ): int {
+        global $wpdb;
+
+        $tracker = self::get_by_id( $id );
+        if ( ! $tracker ) {
+            return 1;
+        }
+
+        $per_page = max( 1, $per_page );
+        $table    = ADT_DB::downloads_table();
+        $before   = (int) $wpdb->get_var(
+            $wpdb->prepare(
+                "SELECT COUNT(*) FROM {$table}
+                 WHERE created_at > %s
+                    OR (created_at = %s AND id > %d)",
+                $tracker->created_at,
+                $tracker->created_at,
+                $id
+            )
+        );
+
+        return (int) floor( $before / $per_page ) + 1;
+    }
+
+    public static function get_page( int $page = 1, int $per_page = 20, string $orderby = 'created_at', string $order = 'DESC' ): array {
+        global $wpdb;
+
+        $allowed_orderby = array(
+            'title'               => 'title',
+            'total_downloads'     => 'total_downloads',
+            'shortcode_downloads' => 'shortcode_downloads',
+            'external_downloads'  => 'external_downloads',
+            'last_downloaded_at'  => 'last_downloaded_at',
+            'created_at'          => 'created_at',
+        );
+
+        $orderby_sql = $allowed_orderby[ $orderby ] ?? 'created_at';
+        $order_sql   = 'ASC' === strtoupper( $order ) ? 'ASC' : 'DESC';
+        $per_page    = max( 1, min( 200, $per_page ) );
+        $page        = max( 1, $page );
+        $offset      = ( $page - 1 ) * $per_page;
+        $table       = ADT_DB::downloads_table();
+
+        // The column and direction are selected exclusively from the allowlists above.
+        $sql = $wpdb->prepare(
+            "SELECT * FROM {$table} ORDER BY {$orderby_sql} {$order_sql}, id {$order_sql} LIMIT %d OFFSET %d",
+            $per_page,
+            $offset
+        );
+
+        return $wpdb->get_results( $sql ) ?: array();
+    }
+
+    public static function update_tracker( int $id, string $title, string $url, int $attachment_id = 0, string $button_text = '' ): bool {
         global $wpdb;
 
         $tracker = self::get_by_id( $id );
@@ -131,13 +206,14 @@ final class ADT_Downloads {
             ADT_DB::downloads_table(),
             array(
                 'title'            => sanitize_text_field( $title ),
+                'button_text'      => '' !== trim( $button_text ) ? sanitize_text_field( $button_text ) : __( 'Download', 'asenka-download-tracker' ),
                 'attachment_id'    => $attachment_id > 0 ? $attachment_id : null,
                 'file_url'         => $url,
                 'destination_hash' => $hash,
                 'updated_at'       => current_time( 'mysql' ),
             ),
             array( 'id' => $id ),
-            array( '%s', '%d', '%s', '%s', '%s' ),
+            array( '%s', '%s', '%d', '%s', '%s', '%s' ),
             array( '%d' )
         );
 
@@ -157,7 +233,7 @@ final class ADT_Downloads {
         // Keep the tracker row and its event history in sync if either delete fails.
         $wpdb->query( 'START TRANSACTION' );
 
-        $events_deleted = $wpdb->delete( $events, array( 'download_id' => $id ), array( '%d' ) );
+        $events_deleted  = $wpdb->delete( $events, array( 'download_id' => $id ), array( '%d' ) );
         $tracker_deleted = $wpdb->delete( $downloads, array( 'id' => $id ), array( '%d' ) );
 
         if ( false === $events_deleted || 1 !== $tracker_deleted ) {
@@ -175,6 +251,60 @@ final class ADT_Downloads {
         do_action( 'adt_download_tracker_deleted', $id );
 
         return true;
+    }
+
+    /**
+     * Create synthetic rows for admin pagination/sorting testing.
+     *
+     * These rows intentionally do not create event-history records. Aggregate
+     * counters and timestamps are enough to exercise the reporting interface.
+     */
+    public static function create_test_rows( int $count = 200 ): int {
+        global $wpdb;
+
+        $count     = max( 1, min( 1000, $count ) );
+        $table     = ADT_DB::downloads_table();
+        $batch     = strtoupper( substr( wp_generate_password( 8, false, false ), 0, 6 ) );
+        $now_ts    = (int) current_time( 'timestamp' );
+        $created   = 0;
+
+        for ( $i = 1; $i <= $count; $i++ ) {
+            $shortcode_count = wp_rand( 0, 900 );
+            $external_count  = wp_rand( 0, 500 );
+            $total_count     = $shortcode_count + $external_count;
+            $created_ts      = $now_ts - wp_rand( 0, 365 * DAY_IN_SECONDS );
+            $last_ts         = $total_count > 0 ? wp_rand( $created_ts, $now_ts ) : 0;
+            $created_at      = gmdate( 'Y-m-d H:i:s', $created_ts );
+            $last_at         = $last_ts ? gmdate( 'Y-m-d H:i:s', $last_ts ) : null;
+            $updated_at      = $last_at ?: $created_at;
+            $url             = 'https://example.com/adt-test-data/' . strtolower( $batch ) . '/file-' . str_pad( (string) $i, 3, '0', STR_PAD_LEFT ) . '.pdf';
+            $title           = sprintf( 'ADT Test File %03d — %s', $i, $batch );
+
+            $inserted = $wpdb->insert(
+                $table,
+                array(
+                    'public_key'          => self::generate_public_key(),
+                    'attachment_id'       => null,
+                    'file_url'            => $url,
+                    'destination_hash'    => self::destination_hash( 0, $url ),
+                    'title'               => $title,
+                    'button_text'         => __( 'Download', 'asenka-download-tracker' ),
+                    'total_downloads'     => $total_count,
+                    'shortcode_downloads' => $shortcode_count,
+                    'external_downloads'  => $external_count,
+                    'last_downloaded_at'  => $last_at,
+                    'created_at'          => $created_at,
+                    'updated_at'          => $updated_at,
+                ),
+                array( '%s', '%d', '%s', '%s', '%s', '%s', '%d', '%d', '%d', '%s', '%s', '%s' )
+            );
+
+            if ( false !== $inserted ) {
+                $created++;
+            }
+        }
+
+        return $created;
     }
 
     public static function build_tracked_url( $tracker, string $source = 'external' ): string {
@@ -195,6 +325,10 @@ final class ADT_Downloads {
 
     public static function shortcode_for( $tracker, string $button_text = '' ): string {
         $atts = '';
+        $button_text = trim( $button_text );
+        if ( '' === $button_text && isset( $tracker->button_text ) ) {
+            $button_text = trim( (string) $tracker->button_text );
+        }
 
         if ( ! empty( $tracker->attachment_id ) ) {
             $atts = 'media="' . (int) $tracker->attachment_id . '"';
@@ -202,7 +336,7 @@ final class ADT_Downloads {
             $atts = 'url="' . esc_url_raw( $tracker->file_url ) . '"';
         }
 
-        if ( '' !== trim( $button_text ) ) {
+        if ( '' !== $button_text && __( 'Download', 'asenka-download-tracker' ) !== $button_text ) {
             $atts .= ' text="' . esc_attr( $button_text ) . '"';
         }
 

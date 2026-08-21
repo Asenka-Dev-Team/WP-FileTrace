@@ -13,7 +13,6 @@
     const $clearMedia = $('#adt-clear-media');
     const $generate = $('#adt-generate');
     const $status = $('#adt-status');
-    const $results = $('#adt-results');
 
     function copyText(text, $button) {
         if (!text) return;
@@ -117,10 +116,12 @@
                 return;
             }
 
-            $('#adt-shortcode-output').text(response.data.shortcode);
-            $('#adt-external-output').text(response.data.externalUrl);
-            $results.prop('hidden', false);
-            $status.addClass('is-success').text('Tracker ready.');
+            $status.addClass('is-success').text(ADTAdmin.strings.created);
+            const page = parseInt(response.data.page, 10) || 1;
+            const target = ADTAdmin.pageUrl
+                + '&orderby=created_at&order=desc&paged=' + encodeURIComponent(page) + '&adt_created='
+                + encodeURIComponent(response.data.id);
+            window.location.assign(target);
         }).fail(function (xhr) {
             let message = ADTAdmin.strings.genericError;
             if (xhr.responseJSON && xhr.responseJSON.data && xhr.responseJSON.data.message) {
@@ -132,17 +133,18 @@
         });
     });
 
-    $(document).on('click', '.adt-copy', function () {
-        const target = document.getElementById($(this).data('target'));
-        copyText(target ? target.textContent : '', $(this));
-    });
-
     $(document).on('click', '.adt-copy-value', function () {
         copyText($(this).data('copy') || '', $(this));
     });
 
     $(document).on('submit', '.adt-delete-form', function (event) {
         if (!window.confirm(ADTAdmin.strings.confirmDelete)) {
+            event.preventDefault();
+        }
+    });
+
+    $(document).on('submit', '.adt-test-form', function (event) {
+        if (!window.confirm(ADTAdmin.strings.confirmTest)) {
             event.preventDefault();
         }
     });

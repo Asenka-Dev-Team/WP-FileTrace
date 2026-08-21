@@ -5,7 +5,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 final class ADT_DB {
-    public const DB_VERSION = '0.1.0';
+    public const DB_VERSION = '0.1.1';
 
     public static function init(): void {
         add_action( 'plugins_loaded', array( __CLASS__, 'maybe_upgrade' ), 20 );
@@ -37,6 +37,7 @@ final class ADT_DB {
             file_url text NOT NULL,
             destination_hash char(64) NOT NULL,
             title varchar(255) NOT NULL DEFAULT '',
+            button_text varchar(255) NOT NULL DEFAULT 'Download',
             total_downloads bigint(20) unsigned NOT NULL DEFAULT 0,
             shortcode_downloads bigint(20) unsigned NOT NULL DEFAULT 0,
             external_downloads bigint(20) unsigned NOT NULL DEFAULT 0,
@@ -47,7 +48,12 @@ final class ADT_DB {
             UNIQUE KEY public_key (public_key),
             UNIQUE KEY destination_hash (destination_hash),
             KEY attachment_id (attachment_id),
-            KEY last_downloaded_at (last_downloaded_at)
+            KEY title (title(191)),
+            KEY total_downloads (total_downloads),
+            KEY shortcode_downloads (shortcode_downloads),
+            KEY external_downloads (external_downloads),
+            KEY last_downloaded_at (last_downloaded_at),
+            KEY created_at (created_at)
         ) {$charset_collate};";
 
         $sql_events = "CREATE TABLE {$events} (
