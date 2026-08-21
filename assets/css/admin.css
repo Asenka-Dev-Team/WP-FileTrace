@@ -206,10 +206,52 @@
 .wft-table { border: 0; box-shadow: none; }
 .wft-table thead th { padding: 11px 12px; background: linear-gradient(180deg, #f9fafb 0%, #f1f3f5 100%); color: #475467; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
 .wft-table td { padding: 12px; vertical-align: middle; }
+.wft-table tbody > tr:not(.wft-edit-row) > td { border-bottom: 1px solid #d8dee6; }
+.wft-table tbody > tr:last-child > td { border-bottom: 0; }
 .wft-file-title { display: block; font-weight: 650; text-decoration: none; }
 .wft-meta { display: block; margin-top: 3px; color: #98a2b3; font-size: 11px; }
-.wft-row-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.wft-row-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .wft-empty-state { padding: 34px !important; text-align: center; color: #667085; }
+
+.wft-check-column {
+    width: 34px;
+    padding-left: 10px !important;
+    padding-right: 4px !important;
+    text-align: center;
+}
+
+.wft-check-column input[type="checkbox"] {
+    margin: 0;
+}
+
+.wft-icon-text-button {
+    display: inline-flex !important;
+    align-items: center;
+    gap: 4px;
+}
+
+.wft-icon-text-button .dashicons {
+    width: 16px;
+    height: 16px;
+    font-size: 16px;
+    line-height: 16px;
+}
+
+.wft-icon-only-button {
+    width: 30px;
+    min-width: 30px;
+    height: 30px;
+    display: inline-grid !important;
+    place-items: center;
+    padding: 0 !important;
+}
+
+.wft-icon-only-button .dashicons {
+    width: 18px;
+    height: 18px;
+    font-size: 18px;
+    line-height: 18px;
+}
 
 .wft-edit-row td { padding: 0 12px 14px !important; background: #f8fafc !important; }
 .wft-edit-form { display: grid; grid-template-columns: minmax(160px, .6fr) minmax(150px, .5fr) minmax(260px, 1.5fr) auto; gap: 12px; align-items: end; padding: 14px; border: 1px solid #dfe4ea; border-radius: 8px; background: #fff; }
@@ -257,6 +299,25 @@
 }
 
 .wft-table-tools form { margin: 0; }
+
+.wft-wrap .wft-bulk-delete-button {
+    border-color: #b32d2e;
+    color: #b32d2e;
+    background: #fff;
+}
+
+.wft-wrap .wft-bulk-delete-button:hover:not(:disabled),
+.wft-wrap .wft-bulk-delete-button:focus:not(:disabled) {
+    border-color: #8a2424;
+    color: #8a2424;
+    background: #fff5f5;
+}
+
+.wft-wrap .wft-bulk-delete-button:disabled {
+    border-color: #dcdcde;
+    color: #a7aaad;
+    background: #f6f7f7;
+}
 
 .wft-table-summary {
     display: flex;

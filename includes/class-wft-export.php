@@ -29,7 +29,7 @@ final class WFT_Export {
         }
 
         fwrite( $output, "\xEF\xBB\xBF" );
-        fputcsv( $output, array( 'Title', 'Button Text', 'Media ID', 'URL', 'Total Downloads', 'Shortcode Downloads', 'External Downloads', 'Last Download', 'Created' ) );
+        fputcsv( $output, array( 'Title', 'Button Text', 'Media ID', 'URL', 'Total Downloads', 'Shortcode Downloads', 'External Downloads', 'Created On', 'Last Download' ) );
 
         foreach ( $rows as $row ) {
             fputcsv(
@@ -42,8 +42,8 @@ final class WFT_Export {
                     $row->total_downloads,
                     $row->shortcode_downloads,
                     $row->external_downloads,
-                    $row->last_downloaded_at,
                     $row->created_at,
+                    $row->last_downloaded_at,
                 )
             );
         }

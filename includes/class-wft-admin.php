@@ -10,10 +10,13 @@ final class WFT_Admin {
 
     public static function init(): void {
         add_action( 'admin_menu', array( __CLASS__, 'admin_menu' ) );
+        add_action( 'admin_head', array( __CLASS__, 'admin_menu_icon_css' ) );
         add_action( 'admin_enqueue_scripts', array( __CLASS__, 'enqueue_assets' ) );
         add_action( 'wp_ajax_wft_create_tracker', array( __CLASS__, 'ajax_create_tracker' ) );
         add_action( 'admin_post_wft_update_tracker', array( __CLASS__, 'update_tracker' ) );
         add_action( 'admin_post_wft_delete_tracker', array( __CLASS__, 'delete_tracker' ) );
+        add_action( 'admin_post_wft_delete_selected_trackers', array( __CLASS__, 'delete_selected_trackers' ) );
+        add_action( 'admin_post_wft_delete_all_trackers', array( __CLASS__, 'delete_all_trackers' ) );
         add_action( 'admin_post_wft_generate_test_rows', array( __CLASS__, 'generate_test_rows' ) );
         add_filter( 'plugin_action_links_' . plugin_basename( WFT_FILE ), array( __CLASS__, 'plugin_action_links' ) );
         add_filter( 'plugin_row_meta', array( __CLASS__, 'plugin_row_meta' ), 10, 2 );
@@ -26,9 +29,23 @@ final class WFT_Admin {
             'manage_options',
             self::PAGE_SLUG,
             array( __CLASS__, 'render_page' ),
-            WFT_URL . 'assets/images/admin-menu-icon.svg',
+            WFT_URL . 'assets/images/icon--wp-filetrace.svg',
             58
         );
+    }
+
+    public static function admin_menu_icon_css(): void {
+        ?>
+        <style id="wft-admin-menu-icon-css">
+            #adminmenu .toplevel_page_<?php echo esc_attr( self::PAGE_SLUG ); ?> .wp-menu-image img {
+                width: 20px !important;
+                height: 20px !important;
+                max-width: 20px !important;
+                max-height: 20px !important;
+                object-fit: contain;
+            }
+        </style>
+        <?php
     }
 
     public static function enqueue_assets( string $hook ): void {
@@ -55,8 +72,10 @@ final class WFT_Admin {
                     'copy'           => __( 'Copy', 'wp-filetrace' ),
                     'genericError'   => __( 'Something went wrong. Please try again.', 'wp-filetrace' ),
                     'created'        => __( 'Tracked file added. Opening it below…', 'wp-filetrace' ),
-                    'confirmDelete'  => __( 'Are you sure? This will permanently delete this tracked file and all of its download history. This cannot be undone.', 'wp-filetrace' ),
-                    'confirmTest'    => __( 'Create 200 synthetic tracked-file rows for sorting and pagination testing?', 'wp-filetrace' ),
+                    'confirmDelete'         => __( 'Are you sure? This will permanently delete this tracked file and all of its download history. This cannot be undone.', 'wp-filetrace' ),
+                    'confirmDeleteSelected' => __( 'Are you sure? This will permanently delete the selected tracked files and all of their download history. This cannot be undone.', 'wp-filetrace' ),
+                    'confirmDeleteAll'      => __( 'Are you sure? This will permanently delete ALL tracked files on every page and all download history. This cannot be undone.', 'wp-filetrace' ),
+                    'confirmTest'           => __( 'Create 200 synthetic tracked-file rows for sorting and pagination testing?', 'wp-filetrace' ),
                 ),
             )
         );
@@ -157,6 +176,67 @@ final class WFT_Admin {
                     'wft_deleted_name' => $deleted ? $deleted_name : '',
                 ),
                 $state
+            ),
+            admin_url( 'admin.php' )
+        );
+
+        wp_safe_redirect( $redirect );
+        exit;
+    }
+
+    public static function delete_selected_trackers(): void {
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_die( esc_html__( 'Permission denied.', 'wp-filetrace' ) );
+        }
+
+        check_admin_referer( 'wft_delete_selected_trackers' );
+
+        $raw_ids = isset( $_POST['tracker_ids'] ) && is_array( $_POST['tracker_ids'] )
+            ? wp_unslash( $_POST['tracker_ids'] )
+            : array();
+        $ids   = array_values( array_filter( array_map( 'absint', $raw_ids ) ) );
+        $state = self::list_state_from_post();
+
+        if ( empty( $ids ) ) {
+            $result = 0;
+            $status = 'none';
+        } else {
+            $result = WFT_Downloads::delete_trackers( $ids );
+            $status = false === $result ? 'error' : 'success';
+        }
+
+        $redirect = add_query_arg(
+            array_merge(
+                array(
+                    'page'              => self::PAGE_SLUG,
+                    'wft_bulk_deleted'  => false === $result ? 0 : (int) $result,
+                    'wft_bulk_status'   => $status,
+                ),
+                $state
+            ),
+            admin_url( 'admin.php' )
+        );
+
+        wp_safe_redirect( $redirect );
+        exit;
+    }
+
+    public static function delete_all_trackers(): void {
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_die( esc_html__( 'Permission denied.', 'wp-filetrace' ) );
+        }
+
+        check_admin_referer( 'wft_delete_all_trackers' );
+
+        $result = WFT_Downloads::delete_all_trackers();
+        $redirect = add_query_arg(
+            array(
+                'page'            => self::PAGE_SLUG,
+                'orderby'         => 'created_at',
+                'order'           => 'desc',
+                'paged'           => 1,
+                'wft_all_deleted' => false === $result ? 0 : (int) $result,
+                'wft_all_status'  => false === $result ? 'error' : 'success',
             ),
             admin_url( 'admin.php' )
         );
@@ -292,7 +372,7 @@ final class WFT_Admin {
             <header class="wft-page-header">
                 <div class="wft-brand">
                     <div class="wft-logo-shell">
-                        <img src="<?php echo esc_url( WFT_URL . 'assets/images/wp-filetrace-logo.svg' ); ?>" alt="<?php esc_attr_e( 'WP FileTrace', 'wp-filetrace' ); ?>">
+                        <img src="<?php echo esc_url( WFT_URL . 'assets/images/logo--wp-filetrace.svg' ); ?>" alt="<?php esc_attr_e( 'WP FileTrace', 'wp-filetrace' ); ?>">
                     </div>
                     <div>
                         <h1><?php esc_html_e( 'WP FileTrace', 'wp-filetrace' ); ?></h1>
@@ -331,6 +411,54 @@ final class WFT_Admin {
                             );
                         } else {
                             esc_html_e( 'Tracked file could not be deleted. No data was intentionally removed.', 'wp-filetrace' );
+                        }
+                        ?>
+                    </p>
+                </div>
+            <?php endif; ?>
+
+            <?php if ( isset( $_GET['wft_bulk_status'] ) ) : ?>
+                <?php
+                $bulk_status = sanitize_key( wp_unslash( $_GET['wft_bulk_status'] ) );
+                $bulk_count  = isset( $_GET['wft_bulk_deleted'] ) ? absint( $_GET['wft_bulk_deleted'] ) : 0;
+                ?>
+                <div class="notice <?php echo 'success' === $bulk_status ? 'notice-success' : ( 'none' === $bulk_status ? 'notice-warning' : 'notice-error' ); ?> is-dismissible">
+                    <p>
+                        <?php
+                        if ( 'success' === $bulk_status ) {
+                            echo esc_html(
+                                sprintf(
+                                    _n( '%d selected tracked file and its download history were permanently deleted.', '%d selected tracked files and their download histories were permanently deleted.', $bulk_count, 'wp-filetrace' ),
+                                    $bulk_count
+                                )
+                            );
+                        } elseif ( 'none' === $bulk_status ) {
+                            esc_html_e( 'No tracked files were selected.', 'wp-filetrace' );
+                        } else {
+                            esc_html_e( 'The selected tracked files could not be deleted. No partial deletion was intentionally committed.', 'wp-filetrace' );
+                        }
+                        ?>
+                    </p>
+                </div>
+            <?php endif; ?>
+
+            <?php if ( isset( $_GET['wft_all_status'] ) ) : ?>
+                <?php
+                $all_status = sanitize_key( wp_unslash( $_GET['wft_all_status'] ) );
+                $all_count  = isset( $_GET['wft_all_deleted'] ) ? absint( $_GET['wft_all_deleted'] ) : 0;
+                ?>
+                <div class="notice <?php echo 'success' === $all_status ? 'notice-success' : 'notice-error'; ?> is-dismissible">
+                    <p>
+                        <?php
+                        if ( 'success' === $all_status ) {
+                            echo esc_html(
+                                sprintf(
+                                    _n( '%d tracked file and its download history were permanently deleted.', '%d tracked files and all associated download history were permanently deleted.', $all_count, 'wp-filetrace' ),
+                                    $all_count
+                                )
+                            );
+                        } else {
+                            esc_html_e( 'Tracked files could not be deleted. No partial deletion was intentionally committed.', 'wp-filetrace' );
                         }
                         ?>
                     </p>
@@ -404,6 +532,22 @@ final class WFT_Admin {
                             <?php wp_nonce_field( 'wft_generate_test_rows' ); ?>
                             <button type="submit" class="button wft-test-button"><?php esc_html_e( 'Generate 200 Test Rows', 'wp-filetrace' ); ?></button>
                         </form>
+
+                        <form id="wft-bulk-delete-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="wft-bulk-delete-form">
+                            <input type="hidden" name="action" value="wft_delete_selected_trackers">
+                            <input type="hidden" name="return_orderby" value="<?php echo esc_attr( $orderby ); ?>">
+                            <input type="hidden" name="return_order" value="<?php echo esc_attr( $order ); ?>">
+                            <input type="hidden" name="return_paged" value="<?php echo (int) $current_page; ?>">
+                            <?php wp_nonce_field( 'wft_delete_selected_trackers' ); ?>
+                            <button type="submit" class="button wft-bulk-delete-button" id="wft-delete-selected" disabled><?php esc_html_e( 'Delete Selected', 'wp-filetrace' ); ?></button>
+                        </form>
+
+                        <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="wft-delete-all-form">
+                            <input type="hidden" name="action" value="wft_delete_all_trackers">
+                            <?php wp_nonce_field( 'wft_delete_all_trackers' ); ?>
+                            <button type="submit" class="button wft-bulk-delete-button"<?php disabled( 0 === $total_items ); ?>><?php esc_html_e( 'Delete All', 'wp-filetrace' ); ?></button>
+                        </form>
+
                         <a class="button" href="<?php echo esc_url( $export_url ); ?>"><?php esc_html_e( 'Export CSV', 'wp-filetrace' ); ?></a>
                     </div>
                 </div>
@@ -414,31 +558,44 @@ final class WFT_Admin {
                 </div>
 
                 <div class="wft-table-wrap">
-                    <table class="widefat striped wft-table">
+                    <table class="widefat wft-table">
                         <thead>
                             <tr>
+                                <th scope="col" class="wft-check-column">
+                                    <input type="checkbox" id="wft-select-all" aria-label="<?php esc_attr_e( 'Select all tracked files on this page', 'wp-filetrace' ); ?>"<?php disabled( empty( $rows ) ); ?>>
+                                </th>
                                 <?php self::render_sortable_header( __( 'File', 'wp-filetrace' ), 'title', $orderby, $order ); ?>
                                 <?php self::render_sortable_header( __( 'Total', 'wp-filetrace' ), 'total_downloads', $orderby, $order ); ?>
                                 <?php self::render_sortable_header( __( 'Shortcode', 'wp-filetrace' ), 'shortcode_downloads', $orderby, $order ); ?>
                                 <?php self::render_sortable_header( __( 'External', 'wp-filetrace' ), 'external_downloads', $orderby, $order ); ?>
+                                <?php self::render_sortable_header( __( 'Created On', 'wp-filetrace' ), 'created_at', $orderby, $order ); ?>
                                 <?php self::render_sortable_header( __( 'Last Download', 'wp-filetrace' ), 'last_downloaded_at', $orderby, $order ); ?>
-                                <?php self::render_sortable_header( __( 'Date Created', 'wp-filetrace' ), 'created_at', $orderby, $order ); ?>
                                 <th scope="col"><?php esc_html_e( 'Actions', 'wp-filetrace' ); ?></th>
                             </tr>
                         </thead>
                         <tbody>
                         <?php if ( empty( $rows ) ) : ?>
-                            <tr><td colspan="7" class="wft-empty-state"><?php esc_html_e( 'No tracked files yet. Create your first one above.', 'wp-filetrace' ); ?></td></tr>
+                            <tr><td colspan="8" class="wft-empty-state"><?php esc_html_e( 'No tracked files yet. Create your first one above.', 'wp-filetrace' ); ?></td></tr>
                         <?php else : ?>
                             <?php foreach ( $rows as $row ) :
                                 $shortcode = WFT_Downloads::shortcode_for( $row );
                                 $external  = WFT_Downloads::build_tracked_url( $row, 'external' );
-                                $last      = $row->last_downloaded_at ? mysql2date( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), $row->last_downloaded_at ) : '—';
                                 $created   = $row->created_at ? mysql2date( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), $row->created_at ) : '—';
+                                $last      = $row->last_downloaded_at ? mysql2date( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), $row->last_downloaded_at ) : '—';
                                 $dialog_id = 'wft-edit-' . (int) $row->id;
                                 $row_class = $highlight_id === (int) $row->id ? ' class="wft-new-row"' : '';
                                 ?>
                                 <tr<?php echo $row_class; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- fixed class string only. ?>>
+                                    <td class="wft-check-column">
+                                        <input
+                                            type="checkbox"
+                                            class="wft-row-checkbox"
+                                            name="tracker_ids[]"
+                                            value="<?php echo (int) $row->id; ?>"
+                                            form="wft-bulk-delete-form"
+                                            aria-label="<?php echo esc_attr( sprintf( __( 'Select %s', 'wp-filetrace' ), $row->title ?: wp_basename( $row->file_url ) ) ); ?>"
+                                        >
+                                    </td>
                                     <td>
                                         <a class="wft-file-title" href="<?php echo esc_url( $row->file_url ); ?>" target="_blank" rel="noopener noreferrer"><?php echo esc_html( $row->title ?: wp_basename( $row->file_url ) ); ?> ↗</a>
                                         <?php if ( $row->attachment_id ) : ?><span class="wft-meta">Media #<?php echo (int) $row->attachment_id; ?></span><?php endif; ?>
@@ -446,13 +603,22 @@ final class WFT_Admin {
                                     <td><strong><?php echo number_format_i18n( (int) $row->total_downloads ); ?></strong></td>
                                     <td><?php echo number_format_i18n( (int) $row->shortcode_downloads ); ?></td>
                                     <td><?php echo number_format_i18n( (int) $row->external_downloads ); ?></td>
-                                    <td><?php echo esc_html( $last ); ?></td>
                                     <td><?php echo esc_html( $created ); ?></td>
+                                    <td><?php echo esc_html( $last ); ?></td>
                                     <td>
                                         <div class="wft-row-actions">
-                                            <button type="button" class="button button-small wft-copy-value" data-copy="<?php echo esc_attr( $shortcode ); ?>"><?php esc_html_e( 'Copy Shortcode', 'wp-filetrace' ); ?></button>
-                                            <button type="button" class="button button-small wft-copy-value" data-copy="<?php echo esc_attr( $external ); ?>"><?php esc_html_e( 'Copy Link', 'wp-filetrace' ); ?></button>
-                                            <button type="button" class="button button-small wft-edit-toggle" data-target="<?php echo esc_attr( $dialog_id ); ?>"><?php esc_html_e( 'Edit', 'wp-filetrace' ); ?></button>
+                                            <button type="button" class="button button-small wft-copy-value wft-icon-text-button" data-copy="<?php echo esc_attr( $shortcode ); ?>">
+                                                <span class="dashicons dashicons-shortcode" aria-hidden="true"></span>
+                                                <span><?php esc_html_e( 'Copy Shortcode', 'wp-filetrace' ); ?></span>
+                                            </button>
+                                            <button type="button" class="button button-small wft-copy-value wft-icon-text-button" data-copy="<?php echo esc_attr( $external ); ?>">
+                                                <span class="dashicons dashicons-admin-links" aria-hidden="true"></span>
+                                                <span><?php esc_html_e( 'Copy Link', 'wp-filetrace' ); ?></span>
+                                            </button>
+                                            <button type="button" class="button button-small wft-edit-toggle wft-icon-only-button" data-target="<?php echo esc_attr( $dialog_id ); ?>" aria-expanded="false" title="<?php esc_attr_e( 'Edit tracked file', 'wp-filetrace' ); ?>">
+                                                <span class="dashicons dashicons-edit" aria-hidden="true"></span>
+                                                <span class="screen-reader-text"><?php esc_html_e( 'Edit tracked file', 'wp-filetrace' ); ?></span>
+                                            </button>
                                             <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="wft-delete-form">
                                                 <input type="hidden" name="action" value="wft_delete_tracker">
                                                 <input type="hidden" name="tracker_id" value="<?php echo (int) $row->id; ?>">
@@ -460,13 +626,16 @@ final class WFT_Admin {
                                                 <input type="hidden" name="return_order" value="<?php echo esc_attr( $order ); ?>">
                                                 <input type="hidden" name="return_paged" value="<?php echo (int) $current_page; ?>">
                                                 <?php wp_nonce_field( 'wft_delete_tracker_' . (int) $row->id ); ?>
-                                                <button type="submit" class="button button-small wft-delete-button"><?php esc_html_e( 'Delete', 'wp-filetrace' ); ?></button>
+                                                <button type="submit" class="button button-small wft-delete-button wft-icon-only-button" title="<?php esc_attr_e( 'Delete tracked file', 'wp-filetrace' ); ?>">
+                                                    <span class="dashicons dashicons-trash" aria-hidden="true"></span>
+                                                    <span class="screen-reader-text"><?php esc_html_e( 'Delete tracked file', 'wp-filetrace' ); ?></span>
+                                                </button>
                                             </form>
                                         </div>
                                     </td>
                                 </tr>
                                 <tr id="<?php echo esc_attr( $dialog_id ); ?>" class="wft-edit-row" hidden>
-                                    <td colspan="7">
+                                    <td colspan="8">
                                         <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="wft-edit-form">
                                             <input type="hidden" name="action" value="wft_update_tracker">
                                             <input type="hidden" name="tracker_id" value="<?php echo (int) $row->id; ?>">

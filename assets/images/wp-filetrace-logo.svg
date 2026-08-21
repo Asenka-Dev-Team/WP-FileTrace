@@ -1,7 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<!-- Placeholder options-page logo. Replace this file with the final WP FileTrace logo SVG while keeping the filename. -->
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="WP FileTrace">
-  <rect x="2" y="2" width="60" height="60" rx="14" fill="#f3f4f6" stroke="#cfd5dd" stroke-width="2"/>
-  <path d="M32 13v27m0 0 10-10M32 40 22 30" fill="none" stroke="#475467" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M18 46v5h28v-5" fill="none" stroke="#475467" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
-</svg>

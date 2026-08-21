@@ -4,9 +4,8 @@
 
 WP FileTrace creates tracked download links for WordPress Media Library files and external file URLs. It records download activity, separates shortcode and external-link traffic, and provides a lightweight WordPress admin interface for managing and exporting tracked-file data.
 
-Developed by **Asenka Interactive**.  
-Primary Developer: **Brian McLendon**  
-[asenka.com](https://asenka.com/)
+Developed by **Asenka Interactive** - [asenka.com](https://asenka.com/)  
+Primary Developer: **Brian McLendon** - [u/eyeofbri](https://github.com/eyeofbri)
 
 ## Requirements
 
@@ -19,13 +18,14 @@ Primary Developer: **Brian McLendon**
 - Generate `[wft]` download-button shortcodes.
 - Generate shareable tracked links for email, documents, and other external use.
 - Record total, shortcode, and external download counts separately.
-- Store the latest download time and tracker creation date.
+- Store the latest download time and **Created On** date.
 - Manage tracked files from a sortable WordPress admin table.
 - Sort by file title, download counts, last download, or creation date.
 - Paginate tracked files at 20 rows per page.
 - Copy shortcode or external tracking links directly from each tracked-file row.
 - Edit tracker title, destination URL, Media Library association, and button text.
 - Permanently delete a tracker together with its stored download-event history.
+- Select individual tracked files for bulk deletion or permanently delete all tracked files across every page.
 - Export tracked-file summaries as CSV.
 - Store anonymous individual download events for future reporting.
 - Ignore `HEAD` requests and common link-preview/prefetch user agents when counting downloads.
@@ -102,25 +102,18 @@ Older `[adt]` shortcodes and `/adt-download/` URLs are **not aliases** in v0.1.2
 
 ## GitHub Updates
 
-WP FileTrace v0.1.3 includes a lightweight GitHub Release updater for public repositories.
-
-Before publishing v0.1.3, set the repository constant in `wp-filetrace.php`:
-
-```php
-define( 'WFT_GITHUB_REPOSITORY', 'YOUR-GITHUB-OWNER/wp-filetrace' );
-```
+WP FileTrace checks the public [Asenka-Dev-Team/WP-FileTrace](https://github.com/Asenka-Dev-Team/WP-FileTrace) repository for the latest GitHub Release and surfaces newer versions through WordPress's normal plugin updater.
 
 Release workflow:
 
 1. Update the plugin version and `changelog.md`.
 2. Commit and push the version to GitHub.
-3. Create a GitHub Release with a tag such as `v0.1.3`.
-4. Attach the packaged plugin ZIP named `wp-filetrace-v0.1.3.zip`.
-5. Future installed versions will periodically check GitHub's latest public release.
+3. Create a GitHub Release with a matching tag such as `v0.1.4`.
+4. Publish the release as a normal release, not a draft or prerelease.
 
-The updater deliberately uses the packaged GitHub Release asset instead of GitHub's automatic source archive. The release asset must be a ZIP containing the top-level `wp-filetrace/` plugin directory. GitHub releases marked as drafts or prereleases are not offered as normal plugin updates.
+WP FileTrace v0.1.4 changes the updater to use GitHub's automatically generated source ZIP and normalizes the extracted repository directory back to `wp-filetrace/` during the WordPress upgrade process. This means **v0.1.5 and later releases will not require a manually uploaded plugin ZIP**.
 
-A release does **not** need to exist before adding the updater. v0.1.3 can be published as the first release that contains update support; the first end-to-end update test can then be performed by publishing v0.1.4.
+**Transition note:** the v0.1.4 GitHub Release should still include `wp-filetrace-v0.1.4.zip` as an attached asset. Installed v0.1.3 copies still use the older asset-based updater and need that one final binary asset in order to discover/install v0.1.4. After v0.1.4 is installed, future updates can use GitHub's generated source ZIP directly.
 
 ## Data Storage
 

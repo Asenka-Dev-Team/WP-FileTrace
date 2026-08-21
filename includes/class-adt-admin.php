@@ -26,7 +26,7 @@ final class ADT_Admin {
             'manage_options',
             self::PAGE_SLUG,
             array( __CLASS__, 'render_page' ),
-            ADT_URL . 'assets/images/admin-menu-icon.svg',
+            ADT_URL . 'assets/images/icon--wp-filetrace.svg',
             58
         );
     }
@@ -292,7 +292,7 @@ final class ADT_Admin {
             <header class="adt-page-header">
                 <div class="adt-brand">
                     <div class="adt-logo-shell">
-                        <img src="<?php echo esc_url( ADT_URL . 'assets/images/asenka-download-tracker-logo.svg' ); ?>" alt="<?php esc_attr_e( 'Asenka Download Tracker', 'asenka-download-tracker' ); ?>">
+                        <img src="<?php echo esc_url( ADT_URL . 'assets/images/logo--wp-filetrace.svg' ); ?>" alt="<?php esc_attr_e( 'Asenka Download Tracker', 'asenka-download-tracker' ); ?>">
                     </div>
                     <div>
                         <h1><?php esc_html_e( 'Asenka Download Tracker', 'asenka-download-tracker' ); ?></h1>

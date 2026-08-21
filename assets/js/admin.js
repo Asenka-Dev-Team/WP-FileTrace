@@ -13,15 +13,17 @@
     const $clearMedia = $('#wft-clear-media');
     const $generate = $('#wft-generate');
     const $status = $('#wft-status');
+    const $selectAll = $('#wft-select-all');
+    const $deleteSelected = $('#wft-delete-selected');
 
     function copyText(text, $button) {
         if (!text) return;
 
         const done = function () {
-            const original = $button.text();
+            const originalHtml = $button.html();
             $button.text(WFTAdmin.strings.copied);
             window.setTimeout(function () {
-                $button.text(original);
+                $button.html(originalHtml);
             }, 1200);
         };
 
@@ -42,6 +44,19 @@
         } finally {
             $temp.remove();
         }
+    }
+
+    function updateBulkSelectionState() {
+        const $rowCheckboxes = $('.wft-row-checkbox');
+        const selectedCount = $rowCheckboxes.filter(':checked').length;
+        const rowCount = $rowCheckboxes.length;
+
+        $deleteSelected.prop('disabled', selectedCount === 0);
+
+        if (!$selectAll.length) return;
+
+        $selectAll.prop('checked', rowCount > 0 && selectedCount === rowCount);
+        $selectAll.prop('indeterminate', selectedCount > 0 && selectedCount < rowCount);
     }
 
     $('#wft-select-media').on('click', function (event) {
@@ -137,8 +152,27 @@
         copyText($(this).data('copy') || '', $(this));
     });
 
+    $selectAll.on('change', function () {
+        $('.wft-row-checkbox').prop('checked', $(this).prop('checked'));
+        updateBulkSelectionState();
+    });
+
+    $(document).on('change', '.wft-row-checkbox', updateBulkSelectionState);
+
     $(document).on('submit', '.wft-delete-form', function (event) {
         if (!window.confirm(WFTAdmin.strings.confirmDelete)) {
+            event.preventDefault();
+        }
+    });
+
+    $(document).on('submit', '.wft-bulk-delete-form', function (event) {
+        if ($('.wft-row-checkbox:checked').length === 0 || !window.confirm(WFTAdmin.strings.confirmDeleteSelected)) {
+            event.preventDefault();
+        }
+    });
+
+    $(document).on('submit', '.wft-delete-all-form', function (event) {
+        if (!window.confirm(WFTAdmin.strings.confirmDeleteAll)) {
             event.preventDefault();
         }
     });
@@ -155,4 +189,6 @@
         target.hidden = !target.hidden;
         $(this).attr('aria-expanded', target.hidden ? 'false' : 'true');
     });
+
+    updateBulkSelectionState();
 })(jQuery);

@@ -253,6 +253,110 @@ final class WFT_Downloads {
         return true;
     }
 
+
+    /**
+     * Permanently delete multiple trackers and all associated event history.
+     *
+     * @param array<int> $ids Tracker IDs.
+     * @return int|false Number of tracker rows deleted, or false on failure.
+     */
+    public static function delete_trackers( array $ids ) {
+        global $wpdb;
+
+        $ids = array_values(
+            array_unique(
+                array_filter(
+                    array_map( 'absint', $ids )
+                )
+            )
+        );
+
+        if ( empty( $ids ) ) {
+            return 0;
+        }
+
+        $downloads    = WFT_DB::downloads_table();
+        $events       = WFT_DB::events_table();
+        $placeholders = implode( ', ', array_fill( 0, count( $ids ), '%d' ) );
+
+        $existing_ids = $wpdb->get_col(
+            $wpdb->prepare(
+                "SELECT id FROM {$downloads} WHERE id IN ({$placeholders})",
+                ...$ids
+            )
+        );
+        $existing_ids = array_values( array_map( 'absint', $existing_ids ?: array() ) );
+
+        if ( empty( $existing_ids ) ) {
+            return 0;
+        }
+
+        $existing_placeholders = implode( ', ', array_fill( 0, count( $existing_ids ), '%d' ) );
+
+        $wpdb->query( 'START TRANSACTION' );
+
+        $events_deleted = $wpdb->query(
+            $wpdb->prepare(
+                "DELETE FROM {$events} WHERE download_id IN ({$existing_placeholders})",
+                ...$existing_ids
+            )
+        );
+        $trackers_deleted = $wpdb->query(
+            $wpdb->prepare(
+                "DELETE FROM {$downloads} WHERE id IN ({$existing_placeholders})",
+                ...$existing_ids
+            )
+        );
+
+        if ( false === $events_deleted || false === $trackers_deleted || count( $existing_ids ) !== (int) $trackers_deleted ) {
+            $wpdb->query( 'ROLLBACK' );
+            return false;
+        }
+
+        $wpdb->query( 'COMMIT' );
+
+        foreach ( $existing_ids as $id ) {
+            do_action( 'wft_download_tracker_deleted', $id );
+        }
+
+        return (int) $trackers_deleted;
+    }
+
+    /**
+     * Permanently delete every tracker and every stored download event.
+     *
+     * @return int|false Number of tracker rows deleted, or false on failure.
+     */
+    public static function delete_all_trackers() {
+        global $wpdb;
+
+        $downloads = WFT_DB::downloads_table();
+        $events    = WFT_DB::events_table();
+        $ids       = array_values( array_map( 'absint', $wpdb->get_col( "SELECT id FROM {$downloads}" ) ?: array() ) );
+
+        if ( empty( $ids ) ) {
+            return 0;
+        }
+
+        $wpdb->query( 'START TRANSACTION' );
+
+        $events_deleted   = $wpdb->query( "DELETE FROM {$events}" );
+        $trackers_deleted = $wpdb->query( "DELETE FROM {$downloads}" );
+
+        if ( false === $events_deleted || false === $trackers_deleted || count( $ids ) !== (int) $trackers_deleted ) {
+            $wpdb->query( 'ROLLBACK' );
+            return false;
+        }
+
+        $wpdb->query( 'COMMIT' );
+
+        foreach ( $ids as $id ) {
+            do_action( 'wft_download_tracker_deleted', $id );
+        }
+
+        return (int) $trackers_deleted;
+    }
+
     /**
      * Create synthetic rows for admin pagination/sorting testing.
      *

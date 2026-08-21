@@ -12,6 +12,31 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ### Fixed
 
+## [0.1.4] - 2026-08-21
+
+### Added
+
+- Added per-row selection checkboxes and a select-all checkbox for the current page.
+- Added **Delete Selected** for bulk-removing selected trackers and all associated download-event history.
+- Added **Delete All** for permanently removing every tracked file and all associated download-event history across all pages.
+- Added Dashicons to the Copy Shortcode and Copy Link actions.
+- Added confirmation prompts and admin notices for bulk deletion actions.
+
+### Changed
+
+- Bumped WP FileTrace to v0.1.4.
+- Changed row Edit and Delete controls to compact Dashicon buttons.
+- Renamed **Date Created** to **Created On** and moved it before **Last Download**.
+- Added stronger horizontal separators between tracked-file rows.
+- Constrained the WP FileTrace admin-menu SVG to the WordPress menu icon area.
+- Configured the GitHub updater for `Asenka-Dev-Team/WP-FileTrace`.
+- Changed the updater to use GitHub's automatically generated release source ZIP for v0.1.5 and later updates; the v0.1.4 transition release still requires one attached ZIP for installed v0.1.3 copies.
+- Preserved Asenka Interactive and Brian McLendon developer attribution in the README.
+
+### Fixed
+
+- Fixed the admin menu icon overflowing its WordPress menu-item container.
+
 ## [0.1.3] - 2026-08-21
 
 ### Added

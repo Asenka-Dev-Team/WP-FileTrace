@@ -27,6 +27,7 @@ final class WFT_Updater {
 
         add_filter( 'pre_set_site_transient_update_plugins', array( __CLASS__, 'check_for_update' ) );
         add_filter( 'plugins_api', array( __CLASS__, 'plugin_information' ), 20, 3 );
+        add_filter( 'upgrader_source_selection', array( __CLASS__, 'normalize_github_source_directory' ), 10, 4 );
         add_action( 'upgrader_process_complete', array( __CLASS__, 'clear_cache_after_upgrade' ), 10, 2 );
         add_action( 'delete_site_transient_update_plugins', array( __CLASS__, 'clear_release_cache' ) );
     }
@@ -46,7 +47,7 @@ final class WFT_Updater {
         return defined( 'WFT_GITHUB_REPOSITORY' )
             && is_string( WFT_GITHUB_REPOSITORY )
             && '' !== trim( WFT_GITHUB_REPOSITORY )
-            && 'OWNER/wp-filetrace' !== WFT_GITHUB_REPOSITORY;
+            && ! in_array( WFT_GITHUB_REPOSITORY, array( 'OWNER/wp-filetrace', 'OWNER/WP-FileTrace' ), true );
     }
 
     public static function check_for_update( $transient ) {
@@ -170,35 +171,77 @@ final class WFT_Updater {
     }
 
     private static function find_release_package( array $release, string $version ): string {
-        if ( empty( $release['assets'] ) || ! is_array( $release['assets'] ) ) {
+        unset( $version );
+
+        if ( empty( $release['zipball_url'] ) || ! is_string( $release['zipball_url'] ) ) {
             return '';
         }
 
-        $preferred_name = '' !== $version ? 'wp-filetrace-v' . $version . '.zip' : '';
-        $fallback       = '';
+        return esc_url_raw( $release['zipball_url'] );
+    }
 
-        foreach ( $release['assets'] as $asset ) {
-            if ( ! is_array( $asset ) ) {
-                continue;
-            }
+    /**
+     * GitHub source archives extract to a repository/tag-specific directory.
+     * Normalize that directory to wp-filetrace so WordPress replaces the
+     * existing plugin folder instead of installing a second version beside it.
+     *
+     * @param string|WP_Error $source        Extracted source directory.
+     * @param string          $remote_source Working directory used by the upgrader.
+     * @param WP_Upgrader     $upgrader      Current upgrader instance.
+     * @param array           $hook_extra    Upgrade context.
+     * @return string|WP_Error
+     */
+    public static function normalize_github_source_directory( $source, string $remote_source, $upgrader, array $hook_extra ) {
+        unset( $upgrader );
 
-            $name = isset( $asset['name'] ) ? (string) $asset['name'] : '';
-            $url  = isset( $asset['browser_download_url'] ) ? esc_url_raw( (string) $asset['browser_download_url'] ) : '';
-
-            if ( '' === $name || '' === $url || ! str_ends_with( strtolower( $name ), '.zip' ) ) {
-                continue;
-            }
-
-            if ( '' !== $preferred_name && $preferred_name === $name ) {
-                return $url;
-            }
-
-            if ( preg_match( '/^wp-filetrace-v[0-9][0-9A-Za-z.\-_]*\.zip$/i', $name ) ) {
-                $fallback = $url;
-            }
+        if ( is_wp_error( $source ) || ! self::is_our_upgrade( $hook_extra ) ) {
+            return $source;
         }
 
-        return $fallback;
+        global $wp_filesystem;
+
+        if ( ! $wp_filesystem ) {
+            return $source;
+        }
+
+        $source = trailingslashit( (string) $source );
+        if ( ! $wp_filesystem->exists( $source . 'wp-filetrace.php' ) ) {
+            return new WP_Error(
+                'wft_invalid_update_package',
+                __( 'The WP FileTrace GitHub archive does not contain wp-filetrace.php at its repository root.', 'wp-filetrace' )
+            );
+        }
+
+        $normalized_source = trailingslashit( $remote_source ) . 'wp-filetrace/';
+
+        if ( untrailingslashit( $source ) === untrailingslashit( $normalized_source ) ) {
+            return $source;
+        }
+
+        if ( $wp_filesystem->exists( $normalized_source ) ) {
+            $wp_filesystem->delete( $normalized_source, true );
+        }
+
+        if ( ! $wp_filesystem->move( $source, $normalized_source, true ) ) {
+            return new WP_Error(
+                'wft_update_directory_normalization_failed',
+                __( 'WP FileTrace could not normalize the GitHub update directory.', 'wp-filetrace' )
+            );
+        }
+
+        return $normalized_source;
+    }
+
+    private static function is_our_upgrade( array $hook_extra ): bool {
+        if ( isset( $hook_extra['plugin'] ) && self::$plugin_basename === $hook_extra['plugin'] ) {
+            return true;
+        }
+
+        if ( isset( $hook_extra['plugins'] ) && is_array( $hook_extra['plugins'] ) && in_array( self::$plugin_basename, $hook_extra['plugins'], true ) ) {
+            return true;
+        }
+
+        return isset( $hook_extra['slug'] ) && 'wp-filetrace' === $hook_extra['slug'];
     }
 
     private static function normalize_version( string $tag ): string {
