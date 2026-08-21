@@ -12,6 +12,31 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ### Fixed
 
+## [0.1.5] - 2026-08-21
+
+### Added
+
+- Added a new **Analytics** tab to the WP FileTrace admin interface.
+- Added an optional saved Global Site Tag field that can output a complete administrator-provided analytics snippet near the top of frontend page heads.
+- Added an optional saved Download Event field for custom `gtag('event', ...)` JavaScript.
+- Added browser-side analytics-event execution after a tracked download is successfully recorded for both shortcode and external/email links.
+- Added an optional File Name Event Parameter setting that injects or overwrites a chosen event parameter with the actual downloaded file name.
+- Added individual controls to clear the Global Site Tag or Download Event settings.
+- Added the `wft_analytics_event_context` filter for customizing analytics event context before the browser handoff is rendered.
+
+### Changed
+
+- Bumped WP FileTrace to v0.1.5.
+- Updated the tracked-download handler so custom browser analytics events run only after the database download tick succeeds.
+- Preserved the existing `wft_download_tracked` server-side action as the general integration hook.
+- Updated the plugin to use the current `icon--wp-filetrace.svg` and `logo--wp-filetrace.svg` asset names without replacing their branding artwork.
+- Updated README documentation for analytics configuration and the GitHub source-ZIP release workflow.
+- Updated uninstall cleanup to remove saved WP FileTrace analytics options.
+
+### Fixed
+
+- Ensured custom analytics event handling works through the same tracked route for shortcode and external downloads instead of relying on the originating page.
+
 ## [0.1.4] - 2026-08-21
 
 ### Added

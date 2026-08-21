@@ -3,7 +3,7 @@
  * Plugin Name: WP FileTrace
  * Plugin URI: https://asenka.com/
  * Description: Track WordPress media and external file downloads through shortcodes and shareable tracked links.
- * Version: 0.1.4
+ * Version: 0.1.5
  * Author: Asenka Interactive
  * Author URI: https://asenka.com/
  * Text Domain: wp-filetrace
@@ -17,7 +17,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-define( 'WFT_VERSION', '0.1.4' );
+define( 'WFT_VERSION', '0.1.5' );
 define( 'WFT_FILE', __FILE__ );
 define( 'WFT_PATH', plugin_dir_path( __FILE__ ) );
 define( 'WFT_URL', plugin_dir_url( __FILE__ ) );
@@ -33,6 +33,7 @@ require_once WFT_PATH . 'includes/class-wft-shortcodes.php';
 require_once WFT_PATH . 'includes/class-wft-router.php';
 require_once WFT_PATH . 'includes/class-wft-export.php';
 require_once WFT_PATH . 'includes/class-wft-admin.php';
+require_once WFT_PATH . 'includes/class-wft-analytics.php';
 require_once WFT_PATH . 'includes/class-wft-updater.php';
 
 final class WP_FileTrace {
@@ -51,6 +52,7 @@ final class WP_FileTrace {
         WFT_Shortcodes::init();
         WFT_Router::init();
         WFT_Export::init();
+        WFT_Analytics::init();
         WFT_Updater::init();
 
         if ( is_admin() ) {

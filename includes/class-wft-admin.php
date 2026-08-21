@@ -18,6 +18,7 @@ final class WFT_Admin {
         add_action( 'admin_post_wft_delete_selected_trackers', array( __CLASS__, 'delete_selected_trackers' ) );
         add_action( 'admin_post_wft_delete_all_trackers', array( __CLASS__, 'delete_all_trackers' ) );
         add_action( 'admin_post_wft_generate_test_rows', array( __CLASS__, 'generate_test_rows' ) );
+        add_action( 'admin_post_wft_save_analytics', array( __CLASS__, 'save_analytics' ) );
         add_filter( 'plugin_action_links_' . plugin_basename( WFT_FILE ), array( __CLASS__, 'plugin_action_links' ) );
         add_filter( 'plugin_row_meta', array( __CLASS__, 'plugin_row_meta' ), 10, 2 );
     }
@@ -268,6 +269,180 @@ final class WFT_Admin {
         exit;
     }
 
+    public static function save_analytics(): void {
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_die( esc_html__( 'Permission denied.', 'wp-filetrace' ) );
+        }
+
+        check_admin_referer( 'wft_save_analytics' );
+
+        $action = isset( $_POST['wft_analytics_action'] ) ? sanitize_key( wp_unslash( $_POST['wft_analytics_action'] ) ) : 'save';
+        $notice = 'saved';
+
+        if ( 'clear_global' === $action ) {
+            WFT_Analytics::clear_global_snippet();
+            $notice = 'global_cleared';
+        } elseif ( 'clear_event' === $action ) {
+            WFT_Analytics::clear_event_settings();
+            $notice = 'event_cleared';
+        } else {
+            $global_snippet = isset( $_POST['wft_ga_global_snippet'] ) ? (string) wp_unslash( $_POST['wft_ga_global_snippet'] ) : '';
+            $event_snippet  = isset( $_POST['wft_ga_event_snippet'] ) ? (string) wp_unslash( $_POST['wft_ga_event_snippet'] ) : '';
+            $file_parameter = isset( $_POST['wft_ga_filename_parameter'] ) ? sanitize_text_field( wp_unslash( $_POST['wft_ga_filename_parameter'] ) ) : '';
+
+            if ( ( '' !== trim( $global_snippet ) || '' !== trim( $event_snippet ) ) && ! current_user_can( 'unfiltered_html' ) ) {
+                wp_die( esc_html__( 'Your account is not allowed to save executable analytics snippets.', 'wp-filetrace' ) );
+            }
+
+            WFT_Analytics::save_settings( $global_snippet, $event_snippet, $file_parameter );
+        }
+
+        wp_safe_redirect(
+            add_query_arg(
+                array(
+                    'page'                 => self::PAGE_SLUG,
+                    'tab'                  => 'analytics',
+                    'wft_analytics_notice' => $notice,
+                ),
+                admin_url( 'admin.php' )
+            )
+        );
+        exit;
+    }
+
+    private static function render_tabs( string $active_tab ): void {
+        $tabs = array(
+            'tracked'   => __( 'Tracked Files', 'wp-filetrace' ),
+            'analytics' => __( 'Analytics', 'wp-filetrace' ),
+        );
+        ?>
+        <nav class="wft-tabs" aria-label="<?php esc_attr_e( 'WP FileTrace sections', 'wp-filetrace' ); ?>">
+            <?php foreach ( $tabs as $tab => $label ) : ?>
+                <a
+                    class="wft-tab<?php echo $active_tab === $tab ? ' is-active' : ''; ?>"
+                    href="<?php echo esc_url( add_query_arg( array( 'page' => self::PAGE_SLUG, 'tab' => $tab ), admin_url( 'admin.php' ) ) ); ?>"
+                    <?php echo $active_tab === $tab ? 'aria-current="page"' : ''; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+                ><?php echo esc_html( $label ); ?></a>
+            <?php endforeach; ?>
+        </nav>
+        <?php
+    }
+
+    private static function render_analytics_page(): void {
+        $global_snippet = WFT_Analytics::get_global_snippet();
+        $event_snippet  = WFT_Analytics::get_event_snippet();
+        $file_parameter = WFT_Analytics::get_filename_parameter();
+        $notice         = isset( $_GET['wft_analytics_notice'] ) ? sanitize_key( wp_unslash( $_GET['wft_analytics_notice'] ) ) : '';
+        ?>
+        <div class="wrap wft-wrap">
+            <header class="wft-page-header">
+                <div class="wft-brand">
+                    <div class="wft-logo-shell">
+                        <img src="<?php echo esc_url( WFT_URL . 'assets/images/logo--wp-filetrace.svg' ); ?>" alt="<?php esc_attr_e( 'WP FileTrace', 'wp-filetrace' ); ?>">
+                    </div>
+                    <div>
+                        <h1><?php esc_html_e( 'WP FileTrace', 'wp-filetrace' ); ?></h1>
+                        <p><?php esc_html_e( 'Create tracked download links, monitor usage, and export download data.', 'wp-filetrace' ); ?></p>
+                    </div>
+                </div>
+                <a class="wft-asenka-link" href="https://asenka.com/" target="_blank" rel="noopener noreferrer">Asenka.com ↗</a>
+            </header>
+
+            <?php self::render_tabs( 'analytics' ); ?>
+
+            <?php if ( $notice ) : ?>
+                <div class="notice notice-success is-dismissible">
+                    <p>
+                        <?php
+                        if ( 'global_cleared' === $notice ) {
+                            esc_html_e( 'Global analytics snippet cleared.', 'wp-filetrace' );
+                        } elseif ( 'event_cleared' === $notice ) {
+                            esc_html_e( 'Download-event snippet and file-name parameter cleared.', 'wp-filetrace' );
+                        } else {
+                            esc_html_e( 'Analytics settings saved.', 'wp-filetrace' );
+                        }
+                        ?>
+                    </p>
+                </div>
+            <?php endif; ?>
+
+            <section class="wft-card wft-analytics-card">
+                <div class="wft-card-heading">
+                    <div>
+                        <span class="wft-eyebrow"><?php esc_html_e( 'Optional Integration', 'wp-filetrace' ); ?></span>
+                        <h2><?php esc_html_e( 'Google Analytics / gtag', 'wp-filetrace' ); ?></h2>
+                    </div>
+                </div>
+
+                <p class="wft-analytics-intro">
+                    <?php esc_html_e( 'Both snippets are optional and independent. Use the global snippet only if WP FileTrace should install the site tag; leave it blank if another theme or plugin already loads gtag.', 'wp-filetrace' ); ?>
+                </p>
+
+                <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="wft-analytics-form">
+                    <input type="hidden" name="action" value="wft_save_analytics">
+                    <?php wp_nonce_field( 'wft_save_analytics' ); ?>
+
+                    <div class="wft-analytics-section">
+                        <div class="wft-analytics-section-heading">
+                            <div>
+                                <h3><?php esc_html_e( 'Global Site Tag', 'wp-filetrace' ); ?></h3>
+                                <p><?php esc_html_e( 'Paste the complete global/site tag exactly as provided, including its script tags. When saved, WP FileTrace prints it near the top of the frontend page head.', 'wp-filetrace' ); ?></p>
+                            </div>
+                            <span class="wft-config-status<?php echo '' !== trim( $global_snippet ) ? ' is-configured' : ''; ?>">
+                                <?php echo '' !== trim( $global_snippet ) ? esc_html__( 'Configured', 'wp-filetrace' ) : esc_html__( 'Not configured', 'wp-filetrace' ); ?>
+                            </span>
+                        </div>
+                        <label class="screen-reader-text" for="wft-ga-global-snippet"><?php esc_html_e( 'Global Site Tag code', 'wp-filetrace' ); ?></label>
+                        <textarea id="wft-ga-global-snippet" class="wft-code-textarea" name="wft_ga_global_snippet" rows="11" spellcheck="false" placeholder="<!-- Google tag (gtag.js) -->&#10;<script async src=&quot;https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXXX&quot;></script>&#10;<script>...</script>"><?php echo esc_textarea( $global_snippet ); ?></textarea>
+                    </div>
+
+                    <div class="wft-analytics-section">
+                        <div class="wft-analytics-section-heading">
+                            <div>
+                                <h3><?php esc_html_e( 'Download Event', 'wp-filetrace' ); ?></h3>
+                                <p><?php esc_html_e( 'Paste JavaScript for the custom gtag event. It runs only after WP FileTrace successfully increments a tracked download, for both shortcode and external links.', 'wp-filetrace' ); ?></p>
+                            </div>
+                            <span class="wft-config-status<?php echo '' !== trim( $event_snippet ) ? ' is-configured' : ''; ?>">
+                                <?php echo '' !== trim( $event_snippet ) ? esc_html__( 'Configured', 'wp-filetrace' ) : esc_html__( 'Not configured', 'wp-filetrace' ); ?>
+                            </span>
+                        </div>
+                        <label class="screen-reader-text" for="wft-ga-event-snippet"><?php esc_html_e( 'Download Event code', 'wp-filetrace' ); ?></label>
+                        <textarea id="wft-ga-event-snippet" class="wft-code-textarea" name="wft_ga_event_snippet" rows="10" spellcheck="false" placeholder="gtag('event', 'file_download', {&#10;    'file_source': 'WP FileTrace'&#10;});"><?php echo esc_textarea( $event_snippet ); ?></textarea>
+                        <p class="description"><?php esc_html_e( 'A surrounding <script> tag is optional for this field. WP FileTrace executes the event during a short browser handoff and then continues to the requested file.', 'wp-filetrace' ); ?></p>
+                    </div>
+
+                    <div class="wft-analytics-section wft-analytics-parameter-section">
+                        <label for="wft-ga-filename-parameter"><?php esc_html_e( 'File Name Event Parameter', 'wp-filetrace' ); ?></label>
+                        <input type="text" id="wft-ga-filename-parameter" name="wft_ga_filename_parameter" value="<?php echo esc_attr( $file_parameter ); ?>" placeholder="file_name">
+                        <p class="description">
+                            <?php esc_html_e( 'Optional. Enter the gtag event parameter that should receive the actual downloaded file name. If your event snippet already sets that parameter, WP FileTrace overwrites its value for the download event. Examples: file_name or value.', 'wp-filetrace' ); ?>
+                        </p>
+                    </div>
+
+                    <div class="wft-analytics-note">
+                        <strong><?php esc_html_e( 'How downloads are handled:', 'wp-filetrace' ); ?></strong>
+                        <?php esc_html_e( 'When Download Event code is configured, a valid tracked request is recorded first, the event runs in the visitor’s browser, and WP FileTrace then redirects to the file. If no event code is configured, downloads retain the normal direct redirect behavior.', 'wp-filetrace' ); ?>
+                    </div>
+
+                    <div class="wft-analytics-actions">
+                        <button type="submit" name="wft_analytics_action" value="save" class="button button-primary"><?php esc_html_e( 'Save Analytics Settings', 'wp-filetrace' ); ?></button>
+                        <button type="submit" name="wft_analytics_action" value="clear_global" class="button"><?php esc_html_e( 'Clear Global Tag', 'wp-filetrace' ); ?></button>
+                        <button type="submit" name="wft_analytics_action" value="clear_event" class="button"><?php esc_html_e( 'Clear Event Settings', 'wp-filetrace' ); ?></button>
+                    </div>
+                </form>
+            </section>
+
+            <footer class="wft-footer">
+                <span><?php echo esc_html( sprintf( __( 'WP FileTrace v%s', 'wp-filetrace' ), WFT_VERSION ) ); ?></span>
+                <span>•</span>
+                <span><?php esc_html_e( 'Primary Developer: Brian McLendon', 'wp-filetrace' ); ?></span>
+                <span>•</span>
+                <a href="https://asenka.com/" target="_blank" rel="noopener noreferrer">Asenka.com</a>
+            </footer>
+        </div>
+        <?php
+    }
+
     private static function list_state_from_post(): array {
         $orderby = isset( $_POST['return_orderby'] ) ? sanitize_key( wp_unslash( $_POST['return_orderby'] ) ) : 'created_at';
         $order   = isset( $_POST['return_order'] ) ? strtolower( sanitize_key( wp_unslash( $_POST['return_order'] ) ) ) : 'desc';
@@ -341,6 +516,12 @@ final class WFT_Admin {
             return;
         }
 
+        $tab = isset( $_GET['tab'] ) ? sanitize_key( wp_unslash( $_GET['tab'] ) ) : 'tracked';
+        if ( 'analytics' === $tab ) {
+            self::render_analytics_page();
+            return;
+        }
+
         $orderby = isset( $_GET['orderby'] ) ? sanitize_key( wp_unslash( $_GET['orderby'] ) ) : 'created_at';
         if ( ! in_array( $orderby, self::sortable_columns(), true ) ) {
             $orderby = 'created_at';
@@ -381,6 +562,8 @@ final class WFT_Admin {
                 </div>
                 <a class="wft-asenka-link" href="https://asenka.com/" target="_blank" rel="noopener noreferrer">Asenka.com ↗</a>
             </header>
+
+            <?php self::render_tabs( 'tracked' ); ?>
 
             <?php if ( $highlight_id ) : ?>
                 <div class="notice notice-success is-dismissible">

@@ -35,6 +35,9 @@ function wft_uninstall_site_data(): void {
     }
 
     delete_option( 'wft_db_version' );
+    delete_option( 'wft_ga_global_snippet' );
+    delete_option( 'wft_ga_event_snippet' );
+    delete_option( 'wft_ga_filename_parameter' );
     delete_option( 'adt_db_version' );
 }
 
@@ -54,6 +57,9 @@ if ( is_multisite() ) {
 
     // Defensive cleanup in case a future/network-level version ever stores these.
     delete_site_option( 'wft_db_version' );
+    delete_site_option( 'wft_ga_global_snippet' );
+    delete_site_option( 'wft_ga_event_snippet' );
+    delete_site_option( 'wft_ga_filename_parameter' );
     delete_site_option( 'adt_db_version' );
 } else {
     wft_uninstall_site_data();

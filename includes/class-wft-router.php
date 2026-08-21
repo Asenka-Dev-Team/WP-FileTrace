@@ -33,10 +33,18 @@ final class WFT_Router {
             wp_die( esc_html__( 'This tracked download link could not be found.', 'wp-filetrace' ), esc_html__( 'Download not found', 'wp-filetrace' ), array( 'response' => 404 ) );
         }
 
-        $method = isset( $_SERVER['REQUEST_METHOD'] ) ? strtoupper( sanitize_text_field( wp_unslash( $_SERVER['REQUEST_METHOD'] ) ) ) : 'GET';
+        $method  = isset( $_SERVER['REQUEST_METHOD'] ) ? strtoupper( sanitize_text_field( wp_unslash( $_SERVER['REQUEST_METHOD'] ) ) ) : 'GET';
+        $source  = isset( $_GET['via'] ) ? sanitize_key( wp_unslash( $_GET['via'] ) ) : 'external';
+        $tracked = false;
+
         if ( 'GET' === $method && ! self::looks_like_prefetch_or_bot() ) {
-            $source = isset( $_GET['via'] ) ? sanitize_key( wp_unslash( $_GET['via'] ) ) : 'external';
-            WFT_Downloads::track( $tracker, $source );
+            $source  = WFT_Downloads::sanitize_source( $source );
+            $tracked = WFT_Downloads::track( $tracker, $source );
+        }
+
+        if ( $tracked && WFT_Analytics::has_event_snippet() ) {
+            WFT_Analytics::render_download_handoff( $tracker, $source );
+            exit;
         }
 
         nocache_headers();

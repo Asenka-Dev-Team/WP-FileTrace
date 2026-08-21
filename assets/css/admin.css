@@ -454,3 +454,164 @@
     .wft-table-tools { justify-content: flex-start; }
     .wft-pagination { justify-content: flex-start; }
 }
+
+/* WP FileTrace section tabs. */
+.wft-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: -4px 0 18px;
+    padding: 0 4px;
+    border-bottom: 1px solid #d9dde3;
+}
+
+.wft-tab {
+    display: inline-flex;
+    align-items: center;
+    min-height: 36px;
+    margin-bottom: -1px;
+    padding: 0 14px;
+    border: 1px solid transparent;
+    border-bottom: 0;
+    border-radius: 8px 8px 0 0;
+    color: #5d6878;
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.wft-tab:hover,
+.wft-tab:focus {
+    color: #1f2937;
+    background: #f7f8fa;
+    outline: none;
+}
+
+.wft-tab.is-active {
+    border-color: #d9dde3;
+    background: #fff;
+    color: #1f4f85;
+    box-shadow: 0 -1px 2px rgba(15, 23, 42, .03);
+}
+
+/* Optional analytics integration. */
+.wft-analytics-card {
+    max-width: 1100px;
+}
+
+.wft-analytics-intro {
+    max-width: 900px;
+    margin: -4px 0 22px;
+    color: #667085;
+}
+
+.wft-analytics-form {
+    display: grid;
+    gap: 18px;
+}
+
+.wft-analytics-section {
+    padding: 18px;
+    border: 1px solid #dfe4ea;
+    border-radius: 9px;
+    background: linear-gradient(180deg, #fcfdfe 0%, #f8fafc 100%);
+}
+
+.wft-analytics-section-heading {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 12px;
+}
+
+.wft-analytics-section-heading h3 {
+    margin: 0 0 5px;
+    color: #1f2937;
+    font-size: 15px;
+}
+
+.wft-analytics-section-heading p {
+    max-width: 760px;
+    margin: 0;
+    color: #667085;
+    font-size: 12px;
+}
+
+.wft-code-textarea {
+    width: 100%;
+    min-height: 180px;
+    box-sizing: border-box;
+    padding: 12px 14px;
+    border: 1px solid #cfd5dd;
+    border-radius: 8px;
+    background: #fff;
+    color: #263140;
+    font-family: Consolas, Monaco, 'Courier New', monospace;
+    font-size: 12px;
+    line-height: 1.55;
+    tab-size: 4;
+    box-shadow: inset 0 1px 2px rgba(15, 23, 42, .04);
+}
+
+.wft-code-textarea:focus,
+.wft-analytics-parameter-section input:focus {
+    border-color: #7c8da5;
+    box-shadow: 0 0 0 2px rgba(71, 84, 103, .12);
+    outline: none;
+}
+
+.wft-config-status {
+    flex: 0 0 auto;
+    padding: 4px 8px;
+    border: 1px solid #d8dee6;
+    border-radius: 999px;
+    background: #fff;
+    color: #7c8798;
+    font-size: 11px;
+    font-weight: 650;
+}
+
+.wft-config-status.is-configured {
+    border-color: #a9d4b4;
+    background: #f1faf3;
+    color: #247238;
+}
+
+.wft-analytics-parameter-section label {
+    display: block;
+    margin-bottom: 7px;
+    color: #344054;
+    font-size: 12px;
+    font-weight: 650;
+}
+
+.wft-analytics-parameter-section input[type="text"] {
+    width: min(420px, 100%);
+    min-height: 40px;
+    padding: 7px 11px;
+    border: 1px solid #cfd5dd;
+    border-radius: 7px;
+    background: #fff;
+}
+
+.wft-analytics-note {
+    padding: 13px 14px;
+    border-left: 3px solid #7891ae;
+    border-radius: 4px 8px 8px 4px;
+    background: #f3f7fb;
+    color: #526172;
+    font-size: 12px;
+}
+
+.wft-analytics-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding-top: 2px;
+}
+
+@media (max-width: 700px) {
+    .wft-analytics-section-heading {
+        flex-direction: column;
+    }
+}

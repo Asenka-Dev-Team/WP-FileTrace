@@ -447,7 +447,7 @@ final class WFT_Downloads {
         return '[wft ' . $atts . ']';
     }
 
-    public static function track( $tracker, string $source ): void {
+    public static function track( $tracker, string $source ): bool {
         global $wpdb;
 
         $source       = self::sanitize_source( $source );
@@ -456,7 +456,7 @@ final class WFT_Downloads {
         $downloads    = WFT_DB::downloads_table();
         $events       = WFT_DB::events_table();
 
-        $wpdb->query(
+        $updated = $wpdb->query(
             $wpdb->prepare(
                 "UPDATE {$downloads}
                  SET total_downloads = total_downloads + 1,
@@ -470,7 +470,7 @@ final class WFT_Downloads {
             )
         );
 
-        $wpdb->insert(
+        $event_inserted = $wpdb->insert(
             $events,
             array(
                 'download_id'   => (int) $tracker->id,
@@ -480,11 +480,15 @@ final class WFT_Downloads {
             array( '%d', '%s', '%s' )
         );
 
+        if ( false === $updated || false === $event_inserted ) {
+            return false;
+        }
+
         /**
          * Fires after WFT records a tracked download.
          *
-         * Intended as the integration point for GA4/Measurement Protocol or
-         * other analytics transports in a future release.
+         * This remains the general-purpose server-side integration point for
+         * analytics, logging, or other download-related integrations.
          *
          * @param int    $download_id Tracker ID.
          * @param string $file_url    Final destination URL.
@@ -492,6 +496,8 @@ final class WFT_Downloads {
          * @param object $tracker     Tracker database row.
          */
         do_action( 'wft_download_tracked', (int) $tracker->id, $tracker->file_url, $source, $tracker );
+
+        return true;
     }
 
     public static function sanitize_source( string $source ): string {
