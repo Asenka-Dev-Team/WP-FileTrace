@@ -65,6 +65,10 @@ if ( is_multisite() ) {
     wft_uninstall_site_data();
 }
 
+// Remove GitHub updater diagnostics/cache stored at the site/network level.
+delete_site_option( 'wft_github_update_status' );
+delete_site_transient( 'wft_github_latest_release' );
+
 // Rebuild rewrite rules without WP FileTrace's /wft-download/ route.
 if ( function_exists( 'flush_rewrite_rules' ) ) {
     flush_rewrite_rules( false );

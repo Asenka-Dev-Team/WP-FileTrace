@@ -19,6 +19,7 @@ final class WFT_Admin {
         add_action( 'admin_post_wft_delete_all_trackers', array( __CLASS__, 'delete_all_trackers' ) );
         add_action( 'admin_post_wft_generate_test_rows', array( __CLASS__, 'generate_test_rows' ) );
         add_action( 'admin_post_wft_save_analytics', array( __CLASS__, 'save_analytics' ) );
+        add_action( 'admin_post_wft_check_updates', array( __CLASS__, 'check_updates' ) );
         add_filter( 'plugin_action_links_' . plugin_basename( WFT_FILE ), array( __CLASS__, 'plugin_action_links' ) );
         add_filter( 'plugin_row_meta', array( __CLASS__, 'plugin_row_meta' ), 10, 2 );
     }
@@ -310,10 +311,36 @@ final class WFT_Admin {
         exit;
     }
 
+    public static function check_updates(): void {
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_die( esc_html__( 'Permission denied.', 'wp-filetrace' ) );
+        }
+
+        check_admin_referer( 'wft_check_updates' );
+
+        $status = WFT_Updater::force_check();
+        $notice = 'connected' === ( $status['connection'] ?? '' )
+            ? ( ! empty( $status['update_available'] ) ? 'available' : 'current' )
+            : 'error';
+
+        wp_safe_redirect(
+            add_query_arg(
+                array(
+                    'page'                    => self::PAGE_SLUG,
+                    'tab'                     => 'updates',
+                    'wft_update_check_notice' => $notice,
+                ),
+                admin_url( 'admin.php' )
+            )
+        );
+        exit;
+    }
+
     private static function render_tabs( string $active_tab ): void {
         $tabs = array(
             'tracked'   => __( 'Tracked Files', 'wp-filetrace' ),
             'analytics' => __( 'Analytics', 'wp-filetrace' ),
+            'updates'   => __( 'Updates', 'wp-filetrace' ),
         );
         ?>
         <nav class="wft-tabs" aria-label="<?php esc_attr_e( 'WP FileTrace sections', 'wp-filetrace' ); ?>">
@@ -443,6 +470,124 @@ final class WFT_Admin {
         <?php
     }
 
+    private static function render_updates_page(): void {
+        $status = WFT_Updater::get_diagnostics();
+        $notice = isset( $_GET['wft_update_check_notice'] ) ? sanitize_key( wp_unslash( $_GET['wft_update_check_notice'] ) ) : '';
+
+        $connection = isset( $status['connection'] ) ? (string) $status['connection'] : 'not_checked';
+        $connection_labels = array(
+            'connected'      => __( 'Connected', 'wp-filetrace' ),
+            'error'          => __( 'Connection Error', 'wp-filetrace' ),
+            'not_checked'    => __( 'Not Checked Yet', 'wp-filetrace' ),
+            'not_configured' => __( 'Not Configured', 'wp-filetrace' ),
+        );
+        $connection_label = $connection_labels[ $connection ] ?? __( 'Unknown', 'wp-filetrace' );
+
+        $last_checked = ! empty( $status['last_checked'] )
+            ? wp_date( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), (int) $status['last_checked'] )
+            : __( 'Never', 'wp-filetrace' );
+
+        $latest_version = ! empty( $status['latest_version'] ) ? 'v' . ltrim( (string) $status['latest_version'], 'vV' ) : '—';
+        ?>
+        <div class="wrap wft-wrap">
+            <header class="wft-page-header">
+                <div class="wft-brand">
+                    <div class="wft-logo-shell">
+                        <img src="<?php echo esc_url( WFT_URL . 'assets/images/logo--wp-filetrace.svg' ); ?>" alt="<?php esc_attr_e( 'WP FileTrace', 'wp-filetrace' ); ?>">
+                    </div>
+                    <div class="wft-info-shell">
+                        <h1><?php esc_html_e( 'WP FileTrace', 'wp-filetrace' ); ?></h1>
+                        <p class="quip"><?php esc_html_e( 'Create tracked download links, monitor usage, and export download data.', 'wp-filetrace' ); ?></p>
+                    </div>
+                </div>
+                <a class="wft-asenka-link" href="https://asenka.com/" target="_blank" rel="noopener noreferrer">Asenka.com ↗</a>
+            </header>
+
+            <?php self::render_tabs( 'updates' ); ?>
+
+            <?php if ( $notice ) : ?>
+                <div class="notice <?php echo 'error' === $notice ? 'notice-error' : 'notice-success'; ?> is-dismissible">
+                    <p>
+                        <?php
+                        if ( 'available' === $notice ) {
+                            esc_html_e( 'Update check completed. A newer WP FileTrace release is available through WordPress Updates.', 'wp-filetrace' );
+                        } elseif ( 'current' === $notice ) {
+                            esc_html_e( 'Update check completed. No newer WP FileTrace release is available.', 'wp-filetrace' );
+                        } else {
+                            esc_html_e( 'WP FileTrace could not complete the GitHub update check. See the connection status below.', 'wp-filetrace' );
+                        }
+                        ?>
+                    </p>
+                </div>
+            <?php endif; ?>
+
+            <section class="wft-card wft-updates-card">
+                <div class="wft-card-heading">
+                    <div>
+                        <span class="wft-eyebrow"><?php esc_html_e( 'GitHub Releases', 'wp-filetrace' ); ?></span>
+                        <h2><?php esc_html_e( 'Update Status', 'wp-filetrace' ); ?></h2>
+                    </div>
+                </div>
+
+                <div class="wft-update-status-grid">
+                    <div class="wft-update-status-item">
+                        <span><?php esc_html_e( 'Installed Version', 'wp-filetrace' ); ?></span>
+                        <strong><?php echo esc_html( 'v' . WFT_VERSION ); ?></strong>
+                    </div>
+                    <div class="wft-update-status-item">
+                        <span><?php esc_html_e( 'Latest Release', 'wp-filetrace' ); ?></span>
+                        <strong><?php echo esc_html( $latest_version ); ?></strong>
+                    </div>
+                    <div class="wft-update-status-item">
+                        <span><?php esc_html_e( 'Last Checked', 'wp-filetrace' ); ?></span>
+                        <strong><?php echo esc_html( $last_checked ); ?></strong>
+                    </div>
+                    <div class="wft-update-status-item">
+                        <span><?php esc_html_e( 'Connection Status', 'wp-filetrace' ); ?></span>
+                        <strong class="wft-update-connection is-<?php echo esc_attr( $connection ); ?>"><?php echo esc_html( $connection_label ); ?></strong>
+                    </div>
+                </div>
+
+                <?php if ( ! empty( $status['message'] ) ) : ?>
+                    <p class="wft-update-message"><?php echo esc_html( (string) $status['message'] ); ?></p>
+                <?php endif; ?>
+
+                <?php if ( ! empty( $status['update_available'] ) ) : ?>
+                    <div class="wft-update-available-note">
+                        <strong><?php esc_html_e( 'Update available.', 'wp-filetrace' ); ?></strong>
+                        <?php esc_html_e( 'WordPress has been refreshed with the latest WP FileTrace release information.', 'wp-filetrace' ); ?>
+                        <a href="<?php echo esc_url( admin_url( 'update-core.php' ) ); ?>"><?php esc_html_e( 'Open WordPress Updates', 'wp-filetrace' ); ?></a>
+                    </div>
+                <?php endif; ?>
+
+                <div class="wft-update-actions">
+                    <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+                        <input type="hidden" name="action" value="wft_check_updates">
+                        <?php wp_nonce_field( 'wft_check_updates' ); ?>
+                        <button type="submit" class="button button-primary">
+                            <span class="dashicons dashicons-update" aria-hidden="true"></span>
+                            <?php esc_html_e( 'Check for Updates', 'wp-filetrace' ); ?>
+                        </button>
+                    </form>
+                    <a class="button" href="<?php echo esc_url( WFT_Updater::releases_url() ); ?>" target="_blank" rel="noopener noreferrer"><?php esc_html_e( 'View GitHub Releases', 'wp-filetrace' ); ?> ↗</a>
+                </div>
+
+                <p class="description wft-update-cache-note">
+                    <?php esc_html_e( 'Automatic GitHub release metadata is cached for up to one hour. Check for Updates bypasses that cache and immediately rebuilds WordPress plugin-update data.', 'wp-filetrace' ); ?>
+                </p>
+            </section>
+
+            <footer class="wft-footer">
+                <span><?php echo esc_html( sprintf( __( 'WP FileTrace v%s', 'wp-filetrace' ), WFT_VERSION ) ); ?></span>
+                <span>•</span>
+                <span><?php esc_html_e( 'Primary Developer: Brian McLendon', 'wp-filetrace' ); ?></span>
+                <span>•</span>
+                <a href="https://asenka.com/" target="_blank" rel="noopener noreferrer">Asenka.com</a>
+            </footer>
+        </div>
+        <?php
+    }
+
     private static function list_state_from_post(): array {
         $orderby = isset( $_POST['return_orderby'] ) ? sanitize_key( wp_unslash( $_POST['return_orderby'] ) ) : 'created_at';
         $order   = isset( $_POST['return_order'] ) ? strtolower( sanitize_key( wp_unslash( $_POST['return_order'] ) ) ) : 'desc';
@@ -519,6 +664,10 @@ final class WFT_Admin {
         $tab = isset( $_GET['tab'] ) ? sanitize_key( wp_unslash( $_GET['tab'] ) ) : 'tracked';
         if ( 'analytics' === $tab ) {
             self::render_analytics_page();
+            return;
+        }
+        if ( 'updates' === $tab ) {
+            self::render_updates_page();
             return;
         }
 

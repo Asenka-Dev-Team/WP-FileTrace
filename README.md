@@ -37,6 +37,8 @@ Primary Developer: **Brian McLendon** - [u/eyeofbri](https://github.com/eyeofbri
 - Support the analytics event flow for both shortcode and external/email tracked links.
 - Include a temporary 200-row synthetic test-data generator for pagination and sorting tests.
 - Check GitHub Releases for new WP FileTrace versions and surface updates through the normal WordPress plugin updater.
+- View installed/latest versions, connection status, and last GitHub check from the WP FileTrace **Updates** tab.
+- Force an immediate GitHub release check with **Check for Updates**, bypassing the normal one-hour WP FileTrace release cache.
 
 ## Shortcodes
 
@@ -74,7 +76,7 @@ This keeps reporting consolidated even when the same file is shared in multiple 
 
 Open **WP FileTrace** from the WordPress admin menu.
 
-The plugin interface contains two tabs:
+The plugin interface contains three tabs:
 
 ### Tracked Files
 
@@ -118,6 +120,19 @@ WP FileTrace will add that parameter to each `gtag('event', ...)` call in the co
 
 The Global Site Tag and Download Event settings are independent. Either can be configured without the other.
 
+### Updates
+
+The Updates tab shows:
+
+- Installed WP FileTrace version
+- Latest normal GitHub release
+- Last time WP FileTrace actually queried GitHub
+- GitHub connection status
+
+The **Check for Updates** button clears WP FileTrace's GitHub-release cache and WordPress's plugin-update transient, immediately requests the latest GitHub Release, and then rebuilds WordPress's plugin-update data. This is useful when a release has just been published and WordPress has not surfaced it yet.
+
+Automatic GitHub release metadata is cached for up to one hour.
+
 ## Developer Hooks
 
 WP FileTrace fires the existing server-side download hook after a tracked request is successfully recorded:
@@ -154,7 +169,7 @@ Release workflow:
 
 1. Update the plugin version and `changelog.md`.
 2. Commit and push the version to GitHub.
-3. Create a GitHub Release with a matching tag such as `v0.1.5`.
+3. Create a GitHub Release with a matching tag such as `v0.1.6`.
 4. Publish the release as a normal release, not a draft or prerelease.
 
 Beginning with v0.1.5, no manually uploaded release ZIP is required. The updater uses GitHub's automatically generated release source ZIP and normalizes its extracted repository directory back to `wp-filetrace/` during the WordPress upgrade process.

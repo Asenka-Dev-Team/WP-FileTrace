@@ -12,6 +12,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ### Fixed
 
+## [0.1.6] - 2026-08-21
+
+### Added
+
+- Added a dedicated **Updates** tab to the WP FileTrace admin interface.
+- Added a **Check for Updates** button that explicitly clears WP FileTrace and WordPress plugin-update caches before immediately querying GitHub Releases.
+- Added updater diagnostics showing the installed version, latest GitHub release, last real GitHub check time, and connection status.
+- Added visible GitHub/API error reporting to the updater status panel instead of silently treating failed checks as no available update.
+- Added a direct link from the Updates tab to the WP FileTrace GitHub Releases page.
+
+### Changed
+
+- Bumped WP FileTrace to v0.1.6.
+- Reduced GitHub release metadata caching from six hours to one hour.
+- Manual update checks now rebuild WordPress plugin-update data in the same request after a successful fresh GitHub response.
+- Updated README documentation for the new update diagnostics and manual release-check workflow.
+
+### Fixed
+
+- Removed the need for temporary code or WP-CLI when forcing WP FileTrace to recognize a newly published GitHub Release.
+
 ## [0.1.5] - 2026-08-21
 
 ### Added

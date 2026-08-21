@@ -10,8 +10,9 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 final class WFT_Updater {
-    private const CACHE_KEY = 'wft_github_latest_release';
-    private const CACHE_TTL = 21600; // 6 hours.
+    private const CACHE_KEY     = 'wft_github_latest_release';
+    private const STATUS_OPTION = 'wft_github_update_status';
+    private const CACHE_TTL     = 3600; // 1 hour.
 
     private static string $plugin_basename = '';
 
@@ -31,7 +32,6 @@ final class WFT_Updater {
         add_action( 'upgrader_process_complete', array( __CLASS__, 'clear_cache_after_upgrade' ), 10, 2 );
         add_action( 'delete_site_transient_update_plugins', array( __CLASS__, 'clear_release_cache' ) );
     }
-
 
     public static function repository_not_configured_notice(): void {
         if ( ! current_user_can( 'update_plugins' ) ) {
@@ -116,6 +116,72 @@ final class WFT_Updater {
         );
     }
 
+    /**
+     * Force a fresh GitHub release request and rebuild WordPress plugin updates.
+     *
+     * @return array<string,mixed>
+     */
+    public static function force_check(): array {
+        // Clear WordPress first. Its deletion hook also clears our release cache.
+        delete_site_transient( 'update_plugins' );
+        self::clear_release_cache();
+
+        $release = self::get_latest_release( true );
+
+        // Rebuild WordPress update data using the fresh GitHub response we just cached.
+        if ( is_array( $release ) && function_exists( 'wp_update_plugins' ) ) {
+            wp_update_plugins();
+        }
+
+        return self::get_diagnostics( false );
+    }
+
+    /**
+     * Get updater diagnostics for the WP FileTrace admin screen.
+     *
+     * @param bool $refresh_if_empty Query GitHub when no status has ever been stored.
+     * @return array<string,mixed>
+     */
+    public static function get_diagnostics( bool $refresh_if_empty = true ): array {
+        $status = get_site_option( self::STATUS_OPTION, array() );
+        $status = is_array( $status ) ? $status : array();
+
+        if ( $refresh_if_empty && empty( $status['last_checked'] ) ) {
+            self::get_latest_release();
+            $status = get_site_option( self::STATUS_OPTION, array() );
+            $status = is_array( $status ) ? $status : array();
+        }
+
+        $latest_version = isset( $status['latest_version'] ) ? (string) $status['latest_version'] : '';
+
+        if ( '' === $latest_version ) {
+            $cached = get_site_transient( self::CACHE_KEY );
+            if ( is_array( $cached ) ) {
+                $latest_version = self::normalize_version( (string) ( $cached['tag_name'] ?? '' ) );
+            }
+        }
+
+        $connection = isset( $status['connection'] ) ? sanitize_key( (string) $status['connection'] ) : 'not_checked';
+        if ( ! self::has_repository() ) {
+            $connection = 'not_configured';
+        }
+
+        return array(
+            'installed_version' => WFT_VERSION,
+            'latest_version'    => $latest_version,
+            'last_checked'      => isset( $status['last_checked'] ) ? absint( $status['last_checked'] ) : 0,
+            'connection'        => $connection,
+            'http_code'         => isset( $status['http_code'] ) ? absint( $status['http_code'] ) : 0,
+            'message'           => isset( $status['message'] ) ? sanitize_text_field( (string) $status['message'] ) : '',
+            'update_available'  => '' !== $latest_version && version_compare( WFT_VERSION, $latest_version, '<' ),
+            'cache_ttl'         => self::CACHE_TTL,
+        );
+    }
+
+    public static function releases_url(): string {
+        return trailingslashit( self::repository_url() ) . 'releases';
+    }
+
     public static function clear_release_cache(): void {
         delete_site_transient( self::CACHE_KEY );
     }
@@ -132,11 +198,13 @@ final class WFT_Updater {
         }
     }
 
-    private static function get_latest_release(): ?array {
-        $cached = get_site_transient( self::CACHE_KEY );
+    private static function get_latest_release( bool $force = false ): ?array {
+        if ( ! $force ) {
+            $cached = get_site_transient( self::CACHE_KEY );
 
-        if ( is_array( $cached ) ) {
-            return $cached;
+            if ( is_array( $cached ) ) {
+                return $cached;
+            }
         }
 
         $endpoint = sprintf(
@@ -155,19 +223,56 @@ final class WFT_Updater {
             )
         );
 
-        if ( is_wp_error( $response ) || 200 !== (int) wp_remote_retrieve_response_code( $response ) ) {
+        if ( is_wp_error( $response ) ) {
+            self::record_check_status( 'error', 0, '', $response->get_error_message() );
+            return null;
+        }
+
+        $http_code = (int) wp_remote_retrieve_response_code( $response );
+        if ( 200 !== $http_code ) {
+            self::record_check_status(
+                'error',
+                $http_code,
+                '',
+                sprintf(
+                    /* translators: %d: HTTP status code returned by GitHub. */
+                    __( 'GitHub returned HTTP %d.', 'wp-filetrace' ),
+                    $http_code
+                )
+            );
             return null;
         }
 
         $release = json_decode( wp_remote_retrieve_body( $response ), true );
 
         if ( ! is_array( $release ) || ! empty( $release['draft'] ) || ! empty( $release['prerelease'] ) ) {
+            self::record_check_status( 'error', $http_code, '', __( 'GitHub did not return a valid normal release.', 'wp-filetrace' ) );
+            return null;
+        }
+
+        $latest_version = self::normalize_version( (string) ( $release['tag_name'] ?? '' ) );
+        if ( '' === $latest_version ) {
+            self::record_check_status( 'error', $http_code, '', __( 'The latest GitHub release has an invalid version tag.', 'wp-filetrace' ) );
             return null;
         }
 
         set_site_transient( self::CACHE_KEY, $release, self::CACHE_TTL );
+        self::record_check_status( 'connected', $http_code, $latest_version, __( 'Connected to GitHub Releases.', 'wp-filetrace' ) );
 
         return $release;
+    }
+
+    private static function record_check_status( string $connection, int $http_code, string $latest_version, string $message ): void {
+        update_site_option(
+            self::STATUS_OPTION,
+            array(
+                'connection'     => sanitize_key( $connection ),
+                'http_code'      => max( 0, $http_code ),
+                'latest_version' => sanitize_text_field( $latest_version ),
+                'last_checked'   => time(),
+                'message'        => sanitize_text_field( $message ),
+            )
+        );
     }
 
     private static function find_release_package( array $release, string $version ): string {

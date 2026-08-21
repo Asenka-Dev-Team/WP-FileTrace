@@ -9,14 +9,12 @@
   align-items: center;
   justify-content: space-between;
   gap: 24px;
+  /* padding: 20px 22px; */
   margin-bottom: 18px;
-  /* padding: 20px 22px;
-  background: linear-gradient(180deg, #ffffff 0%, #f6f7f9 100%);
-  border: 1px solid #d9dde3;
-  border-radius: 12px;
-  box-shadow:
-    0 1px 2px rgba(15, 23, 42, 0.08),
-    0 7px 20px rgba(15, 23, 42, 0.05); */
+  /* background: linear-gradient(180deg, #ffffff 0%, #f6f7f9 100%);
+    border: 1px solid #d9dde3;
+    border-radius: 12px;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, .08), 0 7px 20px rgba(15, 23, 42, .05); */
 }
 
 .wft-brand {
@@ -26,9 +24,9 @@
 }
 
 .wft-logo-shell {
-  width: 150px;
-  height: 150px;
-  flex: 0 0 150px;
+  width: 75px;
+  height: 75px;
+  flex: 0 0 75px;
   display: grid;
   place-items: center;
   overflow: hidden;
@@ -733,5 +731,115 @@
 @media (max-width: 700px) {
   .wft-analytics-section-heading {
     flex-direction: column;
+  }
+}
+
+/* GitHub updater status. */
+.wft-update-status-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.wft-update-status-item {
+  min-width: 0;
+  padding: 15px 16px;
+  border: 1px solid #dfe4ea;
+  border-radius: 9px;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+.wft-update-status-item > span {
+  display: block;
+  margin-bottom: 6px;
+  color: #667085;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.wft-update-status-item > strong {
+  display: block;
+  color: #1f2937;
+  font-size: 16px;
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+
+.wft-update-connection.is-connected {
+  color: #247238;
+}
+.wft-update-connection.is-error {
+  color: #b42318;
+}
+.wft-update-connection.is-not_checked,
+.wft-update-connection.is-not_configured {
+  color: #7c5c15;
+}
+
+.wft-update-message {
+  margin: 0 0 16px;
+  padding: 11px 13px;
+  border-left: 3px solid #98a2b3;
+  background: #f8fafc;
+  color: #475467;
+}
+
+.wft-update-available-note {
+  margin: 0 0 16px;
+  padding: 12px 14px;
+  border: 1px solid #b8dfc1;
+  border-radius: 8px;
+  background: #f2fbf4;
+  color: #245c31;
+}
+
+.wft-update-available-note a {
+  margin-left: 6px;
+}
+
+.wft-update-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding-top: 4px;
+}
+
+.wft-update-actions form {
+  margin: 0;
+}
+
+.wft-update-actions .button-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.wft-update-actions .dashicons {
+  width: 16px;
+  height: 16px;
+  font-size: 16px;
+  line-height: 16px;
+}
+
+.wft-update-cache-note {
+  margin-top: 14px !important;
+}
+
+@media (max-width: 1000px) {
+  .wft-update-status-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 600px) {
+  .wft-update-status-grid {
+    grid-template-columns: 1fr;
   }
 }
