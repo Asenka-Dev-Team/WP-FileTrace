@@ -2,6 +2,8 @@
 
 All notable changes to WP FileTrace will be documented in this file.
 
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and this project uses [Semantic Versioning](https://semver.org/).
+
 ## [Unreleased]
 
 ### Added
@@ -9,6 +11,21 @@ All notable changes to WP FileTrace will be documented in this file.
 ### Changed
 
 ### Fixed
+
+## [0.1.3] - 2026-08-21
+
+### Added
+
+- Added GitHub Release update checks integrated with WordPress's normal plugin update system.
+- Added a version-details response using GitHub release information.
+- Added six-hour caching of GitHub release metadata to limit API requests.
+- Added release-asset selection for packaged `wp-filetrace-vX.Y.Z.zip` files.
+- Bundled the full-data-removal uninstall handler so repository releases clean up WP FileTrace and legacy ADT data when deleted through WordPress.
+
+### Changed
+
+- Bumped WP FileTrace to v0.1.3.
+- Documented the GitHub release/update workflow in `readme.md`.
 
 ## [0.1.2] - 2026-08-21
 
@@ -49,7 +66,7 @@ All notable changes to WP FileTrace will be documented in this file.
 - Changed the creator action label to **Generate Tracking Link**.
 - Styled the Edit action in yellow for faster visual identification.
 
-## [0.1.0] - 2026-08-19
+## [0.1.0] - 2026-08-20
 
 ### Added
 
