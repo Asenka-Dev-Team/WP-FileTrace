@@ -3,23 +3,23 @@
 
     let mediaFrame = null;
 
-    const $attachmentId = $('#adt-attachment-id');
-    const $manualUrl = $('#adt-manual-url');
-    const $title = $('#adt-title');
-    const $buttonText = $('#adt-button-text');
-    const $preview = $('#adt-media-preview');
-    const $mediaName = $('#adt-media-name');
-    const $mediaUrl = $('#adt-media-url');
-    const $clearMedia = $('#adt-clear-media');
-    const $generate = $('#adt-generate');
-    const $status = $('#adt-status');
+    const $attachmentId = $('#wft-attachment-id');
+    const $manualUrl = $('#wft-manual-url');
+    const $title = $('#wft-title');
+    const $buttonText = $('#wft-button-text');
+    const $preview = $('#wft-media-preview');
+    const $mediaName = $('#wft-media-name');
+    const $mediaUrl = $('#wft-media-url');
+    const $clearMedia = $('#wft-clear-media');
+    const $generate = $('#wft-generate');
+    const $status = $('#wft-status');
 
     function copyText(text, $button) {
         if (!text) return;
 
         const done = function () {
             const original = $button.text();
-            $button.text(ADTAdmin.strings.copied);
+            $button.text(WFTAdmin.strings.copied);
             window.setTimeout(function () {
                 $button.text(original);
             }, 1200);
@@ -44,7 +44,7 @@
         }
     }
 
-    $('#adt-select-media').on('click', function (event) {
+    $('#wft-select-media').on('click', function (event) {
         event.preventDefault();
 
         if (mediaFrame) {
@@ -53,8 +53,8 @@
         }
 
         mediaFrame = wp.media({
-            title: ADTAdmin.strings.selectFile,
-            button: { text: ADTAdmin.strings.useFile },
+            title: WFTAdmin.strings.selectFile,
+            button: { text: WFTAdmin.strings.useFile },
             multiple: false
         });
 
@@ -101,55 +101,55 @@
         }
 
         $status.removeClass('is-error is-success').text('');
-        $generate.prop('disabled', true).text(ADTAdmin.strings.working);
+        $generate.prop('disabled', true).text(WFTAdmin.strings.working);
 
-        $.post(ADTAdmin.ajaxUrl, {
-            action: 'adt_create_tracker',
-            nonce: ADTAdmin.nonce,
+        $.post(WFTAdmin.ajaxUrl, {
+            action: 'wft_create_tracker',
+            nonce: WFTAdmin.nonce,
             attachment_id: attachmentId,
             url: url,
             title: $title.val().trim(),
             button_text: $buttonText.val().trim()
         }).done(function (response) {
             if (!response || !response.success) {
-                $status.addClass('is-error').text((response && response.data && response.data.message) || ADTAdmin.strings.genericError);
+                $status.addClass('is-error').text((response && response.data && response.data.message) || WFTAdmin.strings.genericError);
                 return;
             }
 
-            $status.addClass('is-success').text(ADTAdmin.strings.created);
+            $status.addClass('is-success').text(WFTAdmin.strings.created);
             const page = parseInt(response.data.page, 10) || 1;
-            const target = ADTAdmin.pageUrl
-                + '&orderby=created_at&order=desc&paged=' + encodeURIComponent(page) + '&adt_created='
+            const target = WFTAdmin.pageUrl
+                + '&orderby=created_at&order=desc&paged=' + encodeURIComponent(page) + '&wft_created='
                 + encodeURIComponent(response.data.id);
             window.location.assign(target);
         }).fail(function (xhr) {
-            let message = ADTAdmin.strings.genericError;
+            let message = WFTAdmin.strings.genericError;
             if (xhr.responseJSON && xhr.responseJSON.data && xhr.responseJSON.data.message) {
                 message = xhr.responseJSON.data.message;
             }
             $status.addClass('is-error').text(message);
         }).always(function () {
-            $generate.prop('disabled', false).text(ADTAdmin.strings.generate);
+            $generate.prop('disabled', false).text(WFTAdmin.strings.generate);
         });
     });
 
-    $(document).on('click', '.adt-copy-value', function () {
+    $(document).on('click', '.wft-copy-value', function () {
         copyText($(this).data('copy') || '', $(this));
     });
 
-    $(document).on('submit', '.adt-delete-form', function (event) {
-        if (!window.confirm(ADTAdmin.strings.confirmDelete)) {
+    $(document).on('submit', '.wft-delete-form', function (event) {
+        if (!window.confirm(WFTAdmin.strings.confirmDelete)) {
             event.preventDefault();
         }
     });
 
-    $(document).on('submit', '.adt-test-form', function (event) {
-        if (!window.confirm(ADTAdmin.strings.confirmTest)) {
+    $(document).on('submit', '.wft-test-form', function (event) {
+        if (!window.confirm(WFTAdmin.strings.confirmTest)) {
             event.preventDefault();
         }
     });
 
-    $(document).on('click', '.adt-edit-toggle', function () {
+    $(document).on('click', '.wft-edit-toggle', function () {
         const target = document.getElementById($(this).data('target'));
         if (!target) return;
         target.hidden = !target.hidden;
