@@ -12,6 +12,30 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ### Fixed
 
+## [0.1.7] - 2026-08-21
+
+### Added
+
+- Added an AJAX-powered WordPress admin interaction layer while retaining the existing PHP/admin-post flows as non-JavaScript fallbacks.
+- Added in-place tab switching for Tracked Files, Analytics, and Updates.
+- Added AJAX table sorting and pagination without full wp-admin page reloads.
+- Added AJAX tracker editing, single deletion, selected-row deletion, all-row deletion, and synthetic test-row generation.
+- Added AJAX saving/clearing for Analytics settings.
+- Added AJAX **Check for Updates** behavior with live updater diagnostics returned directly to the Updates tab.
+- Added browser history support for AJAX tab, sort, and pagination navigation so Back/Forward navigation remains useful.
+- Added lightweight busy/loading states and inline AJAX error notices.
+
+### Changed
+
+- Bumped WP FileTrace to v0.1.7.
+- Changed **Generate Tracking Link** so newly created/reused trackers refresh and highlight in the Tracked Files interface without navigating/reloading the whole admin page.
+- Changed admin actions to refresh the WP FileTrace interface in place after successful operations.
+- Updated README documentation for the AJAX admin workflow.
+
+### Fixed
+
+- Reduced unnecessary full-page reloads during common WP FileTrace administration tasks while preserving server-rendered fallbacks.
+
 ## [0.1.6] - 2026-08-21
 
 ### Added

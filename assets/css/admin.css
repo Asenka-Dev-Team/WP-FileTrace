@@ -843,3 +843,33 @@
     grid-template-columns: 1fr;
   }
 }
+
+
+/* v0.1.7 AJAX admin UX */
+.wft-wrap.is-wft-ajax-busy {
+  cursor: progress;
+}
+
+.wft-wrap.is-wft-ajax-busy .wft-card,
+.wft-wrap.is-wft-ajax-busy .wft-tabs {
+  transition: opacity 120ms ease;
+}
+
+.wft-wrap.is-wft-ajax-busy .wft-card {
+  opacity: 0.78;
+}
+
+.wft-ajax-notice {
+  margin: 12px 0 18px;
+}
+
+.wft-tabs a,
+.wft-sort-button,
+.wft-pagination a {
+  cursor: pointer;
+}
+
+.wft-wrap.is-wft-ajax-busy .wft-tabs,
+.wft-wrap.is-wft-ajax-busy .wft-card {
+  pointer-events: none;
+}

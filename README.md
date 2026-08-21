@@ -21,6 +21,7 @@ Primary Developer: **Brian McLendon** - [u/eyeofbri](https://github.com/eyeofbri
 - Record total, shortcode, and external download counts separately.
 - Store the latest download time and **Created On** date.
 - Manage tracked files from a sortable WordPress admin table.
+- Use AJAX-powered admin interactions for tabs, sorting, pagination, tracker creation/editing/deletion, analytics settings, test-data generation, and update checks without full page reloads.
 - Sort by file title, download counts, last download, or creation date.
 - Paginate tracked files at 20 rows per page.
 - Copy shortcode or external tracking links directly from each tracked-file row.
@@ -76,7 +77,7 @@ This keeps reporting consolidated even when the same file is shared in multiple 
 
 Open **WP FileTrace** from the WordPress admin menu.
 
-The plugin interface contains three tabs:
+The plugin interface contains three tabs. In JavaScript-enabled wp-admin sessions, switching tabs happens in place without a full page reload:
 
 ### Tracked Files
 
@@ -169,7 +170,7 @@ Release workflow:
 
 1. Update the plugin version and `changelog.md`.
 2. Commit and push the version to GitHub.
-3. Create a GitHub Release with a matching tag such as `v0.1.6`.
+3. Create a GitHub Release with a matching tag such as `v0.1.7`.
 4. Publish the release as a normal release, not a draft or prerelease.
 
 Beginning with v0.1.5, no manually uploaded release ZIP is required. The updater uses GitHub's automatically generated release source ZIP and normalizes its extracted repository directory back to `wp-filetrace/` during the WordPress upgrade process.

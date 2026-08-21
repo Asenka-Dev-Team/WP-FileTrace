@@ -13,6 +13,14 @@ final class WFT_Admin {
         add_action( 'admin_head', array( __CLASS__, 'admin_menu_icon_css' ) );
         add_action( 'admin_enqueue_scripts', array( __CLASS__, 'enqueue_assets' ) );
         add_action( 'wp_ajax_wft_create_tracker', array( __CLASS__, 'ajax_create_tracker' ) );
+        add_action( 'wp_ajax_wft_render_admin_view', array( __CLASS__, 'ajax_render_admin_view' ) );
+        add_action( 'wp_ajax_wft_update_tracker', array( __CLASS__, 'ajax_update_tracker' ) );
+        add_action( 'wp_ajax_wft_delete_tracker', array( __CLASS__, 'ajax_delete_tracker' ) );
+        add_action( 'wp_ajax_wft_delete_selected_trackers', array( __CLASS__, 'ajax_delete_selected_trackers' ) );
+        add_action( 'wp_ajax_wft_delete_all_trackers', array( __CLASS__, 'ajax_delete_all_trackers' ) );
+        add_action( 'wp_ajax_wft_generate_test_rows', array( __CLASS__, 'ajax_generate_test_rows' ) );
+        add_action( 'wp_ajax_wft_save_analytics', array( __CLASS__, 'ajax_save_analytics' ) );
+        add_action( 'wp_ajax_wft_check_updates', array( __CLASS__, 'ajax_check_updates' ) );
         add_action( 'admin_post_wft_update_tracker', array( __CLASS__, 'update_tracker' ) );
         add_action( 'admin_post_wft_delete_tracker', array( __CLASS__, 'delete_tracker' ) );
         add_action( 'admin_post_wft_delete_selected_trackers', array( __CLASS__, 'delete_selected_trackers' ) );
@@ -70,10 +78,15 @@ final class WFT_Admin {
                     'useFile'        => __( 'Use this file', 'wp-filetrace' ),
                     'working'        => __( 'Generating…', 'wp-filetrace' ),
                     'generate'       => __( 'Generate Tracking Link', 'wp-filetrace' ),
+                    'loading'        => __( 'Loading…', 'wp-filetrace' ),
+                    'saving'         => __( 'Saving…', 'wp-filetrace' ),
+                    'deleting'       => __( 'Deleting…', 'wp-filetrace' ),
+                    'checking'       => __( 'Checking…', 'wp-filetrace' ),
+                    'testing'        => __( 'Generating test rows…', 'wp-filetrace' ),
                     'copied'         => __( 'Copied!', 'wp-filetrace' ),
                     'copy'           => __( 'Copy', 'wp-filetrace' ),
                     'genericError'   => __( 'Something went wrong. Please try again.', 'wp-filetrace' ),
-                    'created'        => __( 'Tracked file added. Opening it below…', 'wp-filetrace' ),
+                    'created'        => __( 'Tracked file added.', 'wp-filetrace' ),
                     'confirmDelete'         => __( 'Are you sure? This will permanently delete this tracked file and all of its download history. This cannot be undone.', 'wp-filetrace' ),
                     'confirmDeleteSelected' => __( 'Are you sure? This will permanently delete the selected tracked files and all of their download history. This cannot be undone.', 'wp-filetrace' ),
                     'confirmDeleteAll'      => __( 'Are you sure? This will permanently delete ALL tracked files on every page and all download history. This cannot be undone.', 'wp-filetrace' ),
@@ -99,11 +112,7 @@ final class WFT_Admin {
     }
 
     public static function ajax_create_tracker(): void {
-        if ( ! current_user_can( 'manage_options' ) ) {
-            wp_send_json_error( array( 'message' => __( 'Permission denied.', 'wp-filetrace' ) ), 403 );
-        }
-
-        check_ajax_referer( 'wft_admin', 'nonce' );
+        self::ajax_guard();
 
         $attachment_id = isset( $_POST['attachment_id'] ) ? absint( $_POST['attachment_id'] ) : 0;
         $url           = isset( $_POST['url'] ) ? esc_url_raw( wp_unslash( $_POST['url'] ) ) : '';
@@ -115,11 +124,275 @@ final class WFT_Admin {
             wp_send_json_error( array( 'message' => $tracker->get_error_message() ), 400 );
         }
 
-        wp_send_json_success(
+        $page = WFT_Downloads::get_created_desc_page_for_id( (int) $tracker->id, self::PER_PAGE );
+
+        self::ajax_send_page(
+            array(
+                'tab'         => 'tracked',
+                'orderby'     => 'created_at',
+                'order'       => 'desc',
+                'paged'       => $page,
+                'wft_created' => (int) $tracker->id,
+            ),
             array(
                 'id'    => (int) $tracker->id,
                 'title' => $tracker->title,
-                'page'  => WFT_Downloads::get_created_desc_page_for_id( (int) $tracker->id, self::PER_PAGE ),
+            )
+        );
+    }
+
+    public static function ajax_render_admin_view(): void {
+        self::ajax_guard();
+
+        $tab = isset( $_POST['tab'] ) ? sanitize_key( wp_unslash( $_POST['tab'] ) ) : 'tracked';
+        if ( ! in_array( $tab, array( 'tracked', 'analytics', 'updates' ), true ) ) {
+            $tab = 'tracked';
+        }
+
+        $query = array( 'tab' => $tab );
+
+        if ( 'tracked' === $tab ) {
+            $state = self::list_state_from_request();
+            $query = array_merge( $query, $state );
+        }
+
+        self::ajax_send_page( $query );
+    }
+
+    public static function ajax_update_tracker(): void {
+        self::ajax_guard();
+
+        $id            = isset( $_POST['tracker_id'] ) ? absint( $_POST['tracker_id'] ) : 0;
+        $title         = isset( $_POST['title'] ) ? sanitize_text_field( wp_unslash( $_POST['title'] ) ) : '';
+        $url           = isset( $_POST['file_url'] ) ? esc_url_raw( wp_unslash( $_POST['file_url'] ) ) : '';
+        $attachment_id = isset( $_POST['attachment_id'] ) ? absint( $_POST['attachment_id'] ) : 0;
+        $button_text   = isset( $_POST['button_text'] ) ? sanitize_text_field( wp_unslash( $_POST['button_text'] ) ) : '';
+        $state         = self::list_state_from_request();
+
+        $ok = $id > 0 && WFT_Downloads::update_tracker( $id, $title, $url, $attachment_id, $button_text );
+
+        self::ajax_send_page(
+            array_merge(
+                array(
+                    'tab'         => 'tracked',
+                    'wft_updated' => $ok ? '1' : '0',
+                ),
+                $state
+            )
+        );
+    }
+
+    public static function ajax_delete_tracker(): void {
+        self::ajax_guard();
+
+        $id      = isset( $_POST['tracker_id'] ) ? absint( $_POST['tracker_id'] ) : 0;
+        $state   = self::list_state_from_request();
+        $tracker = $id > 0 ? WFT_Downloads::get_by_id( $id ) : null;
+
+        $deleted_name = $tracker && ! empty( $tracker->title )
+            ? $tracker->title
+            : __( 'Untitled tracked file', 'wp-filetrace' );
+
+        $deleted = $tracker && WFT_Downloads::delete_tracker( $id );
+
+        self::ajax_send_page(
+            array_merge(
+                array(
+                    'tab'              => 'tracked',
+                    'wft_deleted'      => $deleted ? '1' : '0',
+                    'wft_deleted_name' => $deleted ? $deleted_name : '',
+                ),
+                $state
+            )
+        );
+    }
+
+    public static function ajax_delete_selected_trackers(): void {
+        self::ajax_guard();
+
+        $raw_ids = isset( $_POST['tracker_ids'] ) && is_array( $_POST['tracker_ids'] )
+            ? wp_unslash( $_POST['tracker_ids'] )
+            : array();
+        $ids   = array_values( array_unique( array_filter( array_map( 'absint', $raw_ids ) ) ) );
+        $state = self::list_state_from_request();
+
+        if ( empty( $ids ) ) {
+            $result = 0;
+            $status = 'none';
+        } else {
+            $result = WFT_Downloads::delete_trackers( $ids );
+            $status = false === $result ? 'error' : 'success';
+        }
+
+        self::ajax_send_page(
+            array_merge(
+                array(
+                    'tab'              => 'tracked',
+                    'wft_bulk_deleted' => false === $result ? 0 : (int) $result,
+                    'wft_bulk_status'  => $status,
+                ),
+                $state
+            )
+        );
+    }
+
+    public static function ajax_delete_all_trackers(): void {
+        self::ajax_guard();
+
+        $result = WFT_Downloads::delete_all_trackers();
+
+        self::ajax_send_page(
+            array(
+                'tab'             => 'tracked',
+                'orderby'         => 'created_at',
+                'order'           => 'desc',
+                'paged'           => 1,
+                'wft_all_deleted' => false === $result ? 0 : (int) $result,
+                'wft_all_status'  => false === $result ? 'error' : 'success',
+            )
+        );
+    }
+
+    public static function ajax_generate_test_rows(): void {
+        self::ajax_guard();
+
+        $created = WFT_Downloads::create_test_rows( 200 );
+
+        self::ajax_send_page(
+            array(
+                'tab'          => 'tracked',
+                'orderby'      => 'created_at',
+                'order'        => 'desc',
+                'paged'        => 1,
+                'wft_test_rows'=> $created,
+            )
+        );
+    }
+
+    public static function ajax_save_analytics(): void {
+        self::ajax_guard();
+
+        $action = isset( $_POST['wft_analytics_action'] ) ? sanitize_key( wp_unslash( $_POST['wft_analytics_action'] ) ) : 'save';
+        $notice = 'saved';
+
+        if ( 'clear_global' === $action ) {
+            WFT_Analytics::clear_global_snippet();
+            $notice = 'global_cleared';
+        } elseif ( 'clear_event' === $action ) {
+            WFT_Analytics::clear_event_settings();
+            $notice = 'event_cleared';
+        } else {
+            $global_snippet = isset( $_POST['wft_ga_global_snippet'] ) ? (string) wp_unslash( $_POST['wft_ga_global_snippet'] ) : '';
+            $event_snippet  = isset( $_POST['wft_ga_event_snippet'] ) ? (string) wp_unslash( $_POST['wft_ga_event_snippet'] ) : '';
+            $file_parameter = isset( $_POST['wft_ga_filename_parameter'] ) ? sanitize_text_field( wp_unslash( $_POST['wft_ga_filename_parameter'] ) ) : '';
+
+            if ( ( '' !== trim( $global_snippet ) || '' !== trim( $event_snippet ) ) && ! current_user_can( 'unfiltered_html' ) ) {
+                wp_send_json_error( array( 'message' => __( 'Your account is not allowed to save executable analytics snippets.', 'wp-filetrace' ) ), 403 );
+            }
+
+            WFT_Analytics::save_settings( $global_snippet, $event_snippet, $file_parameter );
+        }
+
+        self::ajax_send_page(
+            array(
+                'tab'                  => 'analytics',
+                'wft_analytics_notice' => $notice,
+            )
+        );
+    }
+
+    public static function ajax_check_updates(): void {
+        self::ajax_guard();
+
+        $status = WFT_Updater::force_check();
+        $notice = 'connected' === ( $status['connection'] ?? '' )
+            ? ( ! empty( $status['update_available'] ) ? 'available' : 'current' )
+            : 'error';
+
+        self::ajax_send_page(
+            array(
+                'tab'                     => 'updates',
+                'wft_update_check_notice' => $notice,
+            ),
+            array( 'diagnostics' => $status )
+        );
+    }
+
+    private static function ajax_guard(): void {
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( array( 'message' => __( 'Permission denied.', 'wp-filetrace' ) ), 403 );
+        }
+
+        check_ajax_referer( 'wft_admin', 'nonce' );
+    }
+
+    private static function list_state_from_request(): array {
+        $orderby = isset( $_POST['orderby'] )
+            ? sanitize_key( wp_unslash( $_POST['orderby'] ) )
+            : ( isset( $_POST['return_orderby'] ) ? sanitize_key( wp_unslash( $_POST['return_orderby'] ) ) : 'created_at' );
+        $order = isset( $_POST['order'] )
+            ? strtolower( sanitize_key( wp_unslash( $_POST['order'] ) ) )
+            : ( isset( $_POST['return_order'] ) ? strtolower( sanitize_key( wp_unslash( $_POST['return_order'] ) ) ) : 'desc' );
+        $paged = isset( $_POST['paged'] )
+            ? max( 1, absint( $_POST['paged'] ) )
+            : ( isset( $_POST['return_paged'] ) ? max( 1, absint( $_POST['return_paged'] ) ) : 1 );
+
+        if ( ! in_array( $orderby, self::sortable_columns(), true ) ) {
+            $orderby = 'created_at';
+        }
+
+        return array(
+            'orderby' => $orderby,
+            'order'   => 'asc' === $order ? 'asc' : 'desc',
+            'paged'   => $paged,
+        );
+    }
+
+    private static function ajax_send_page( array $query, array $extra = array() ): void {
+        $old_get = $_GET;
+
+        $_GET = array_merge(
+            array( 'page' => self::PAGE_SLUG ),
+            $query
+        );
+
+        ob_start();
+        self::render_page();
+        $html = (string) ob_get_clean();
+
+        $_GET = $old_get;
+
+        $tab = isset( $query['tab'] ) ? sanitize_key( (string) $query['tab'] ) : 'tracked';
+        if ( ! in_array( $tab, array( 'tracked', 'analytics', 'updates' ), true ) ) {
+            $tab = 'tracked';
+        }
+
+        $url_args = array(
+            'page' => self::PAGE_SLUG,
+            'tab'  => $tab,
+        );
+
+        if ( 'tracked' === $tab ) {
+            $total_pages = max( 1, (int) ceil( WFT_Downloads::get_count() / self::PER_PAGE ) );
+            $requested_page = isset( $query['paged'] ) ? max( 1, absint( $query['paged'] ) ) : 1;
+            $state = array(
+                'orderby' => isset( $query['orderby'] ) && in_array( sanitize_key( (string) $query['orderby'] ), self::sortable_columns(), true )
+                    ? sanitize_key( (string) $query['orderby'] )
+                    : 'created_at',
+                'order'   => isset( $query['order'] ) && 'asc' === strtolower( (string) $query['order'] ) ? 'asc' : 'desc',
+                'paged'   => min( $requested_page, $total_pages ),
+            );
+            $url_args = array_merge( $url_args, $state );
+        }
+
+        wp_send_json_success(
+            array_merge(
+                array(
+                    'html' => $html,
+                    'url'  => add_query_arg( $url_args, admin_url( 'admin.php' ) ),
+                    'tab'  => $tab,
+                ),
+                $extra
             )
         );
     }
@@ -561,7 +834,7 @@ final class WFT_Admin {
                 <?php endif; ?>
 
                 <div class="wft-update-actions">
-                    <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+                    <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="wft-update-check-form">
                         <input type="hidden" name="action" value="wft_check_updates">
                         <?php wp_nonce_field( 'wft_check_updates' ); ?>
                         <button type="submit" class="button button-primary">
