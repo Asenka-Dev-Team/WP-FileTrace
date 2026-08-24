@@ -1433,6 +1433,137 @@ final class WFT_Admin {
                 </section>
             <?php endif; ?>
 
+            <?php if ( $scan && ! empty( $scan['audit'] ) && is_array( $scan['audit'] ) ) : ?>
+                <?php $audit = $scan['audit']; ?>
+                <section class="wft-card wft-sdm-audit-card">
+                    <div class="wft-card-heading">
+                        <div>
+                            <span class="wft-eyebrow"><?php esc_html_e( 'Inventory', 'wp-filetrace' ); ?></span>
+                            <h2><?php esc_html_e( 'SDM Usage Audit', 'wp-filetrace' ); ?></h2>
+                        </div>
+                    </div>
+
+                    <p><?php esc_html_e( 'This audit inventories Simple Download Monitor records separately from shortcode occurrences. It helps explain why the number of SDM download items can be much larger than the number of individual shortcodes found by the migration pass.', 'wp-filetrace' ); ?></p>
+
+                    <div class="wft-migration-metrics wft-audit-metrics">
+                        <div class="wft-migration-metric"><span><?php esc_html_e( 'SDM Items', 'wp-filetrace' ); ?></span><strong><?php echo number_format_i18n( (int) $audit['total_items'] ); ?></strong></div>
+                        <div class="wft-migration-metric"><span><?php esc_html_e( 'Referenced IDs', 'wp-filetrace' ); ?></span><strong><?php echo number_format_i18n( (int) $audit['referenced_ids'] ); ?></strong></div>
+                        <div class="wft-migration-metric is-ready"><span><?php esc_html_e( 'Standard Shortcode IDs', 'wp-filetrace' ); ?></span><strong><?php echo number_format_i18n( (int) $audit['standard_shortcode_ids'] ); ?></strong></div>
+                        <div class="wft-migration-metric"><span><?php esc_html_e( 'Direct URL IDs', 'wp-filetrace' ); ?></span><strong><?php echo number_format_i18n( (int) $audit['direct_url_ids'] ); ?></strong></div>
+                        <div class="wft-migration-metric"><span><?php esc_html_e( 'Other SDM Reference IDs', 'wp-filetrace' ); ?></span><strong><?php echo number_format_i18n( (int) $audit['related_shortcode_ids'] + (int) $audit['hidden_shortcode_ids'] ); ?></strong></div>
+                        <div class="wft-migration-metric is-review"><span><?php esc_html_e( 'No Direct Reference Found', 'wp-filetrace' ); ?></span><strong><?php echo number_format_i18n( (int) $audit['no_direct_reference'] ); ?></strong></div>
+                    </div>
+
+                    <div class="notice notice-info inline">
+                        <p>
+                            <?php
+                            printf(
+                                esc_html__( 'The migration found %1$d individual SDM shortcode occurrence(s), while those occurrences reference %2$d unique SDM item ID(s). WP FileTrace currently expects %3$d unique tracker destination(s) to be created or reused.', 'wp-filetrace' ),
+                                (int) $scan['total'],
+                                (int) $audit['standard_shortcode_ids'],
+                                (int) $scan['create'] + (int) $scan['reuse']
+                            );
+                            ?>
+                        </p>
+                    </div>
+
+                    <?php if ( ! empty( $audit['category_listing_occurrences'] ) ) : ?>
+                        <div class="notice notice-warning inline">
+                            <p>
+                                <?php
+                                printf(
+                                    esc_html__( 'Found %1$d SDM category/listing shortcode occurrence(s) across %2$d content/meta location(s). A category listing can expose many download items dynamically, so “No Direct Reference Found” does not mean an SDM item is definitely unused.', 'wp-filetrace' ),
+                                    (int) $audit['category_listing_occurrences'],
+                                    (int) $audit['category_listing_locations']
+                                );
+                                ?>
+                            </p>
+                        </div>
+                    <?php else : ?>
+                        <p class="description"><?php esc_html_e( '“No Direct Reference Found” means this audit did not find the SDM item ID in a standard download shortcode, supported SDM info/counter/link shortcode, hidden-download shortcode, or direct SDM process URL. It is intentionally not labeled “unused” because references may still exist outside the content/meta patterns this beta scanner understands.', 'wp-filetrace' ); ?></p>
+                    <?php endif; ?>
+
+                    <?php if ( ! empty( $audit['missing_file_url'] ) ) : ?>
+                        <div class="notice notice-warning inline">
+                            <p><?php echo esc_html( sprintf( __( '%d SDM item(s) do not currently resolve to a valid HTTP/HTTPS file URL.', 'wp-filetrace' ), (int) $audit['missing_file_url'] ) ); ?></p>
+                        </div>
+                    <?php endif; ?>
+
+                    <details class="wft-audit-details">
+                        <summary><?php echo esc_html( sprintf( __( 'Review all %d SDM item(s)', 'wp-filetrace' ), (int) $audit['total_items'] ) ); ?></summary>
+                        <div class="wft-table-wrap wft-audit-table-wrap">
+                            <table class="widefat wft-table wft-audit-table">
+                                <thead>
+                                    <tr>
+                                        <th><?php esc_html_e( 'SDM Item', 'wp-filetrace' ); ?></th>
+                                        <th><?php esc_html_e( 'Status', 'wp-filetrace' ); ?></th>
+                                        <th><?php esc_html_e( 'File', 'wp-filetrace' ); ?></th>
+                                        <th><?php esc_html_e( 'Standard Download', 'wp-filetrace' ); ?></th>
+                                        <th><?php esc_html_e( 'Other SDM References', 'wp-filetrace' ); ?></th>
+                                        <th><?php esc_html_e( 'Audit Result', 'wp-filetrace' ); ?></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php foreach ( $audit['items'] as $audit_item ) : ?>
+                                        <?php
+                                        $sdm_edit_link = get_edit_post_link( (int) $audit_item['sdm_id'], '' );
+                                        $audit_file_name = ! empty( $audit_item['file_url'] ) ? wp_basename( (string) wp_parse_url( $audit_item['file_url'], PHP_URL_PATH ) ) : '';
+                                        $other_parts = array();
+                                        $direct_count = (int) $audit_item['direct_content'] + (int) $audit_item['direct_meta'];
+                                        $related_count = (int) $audit_item['related_content'] + (int) $audit_item['related_meta'];
+                                        $hidden_count = (int) $audit_item['hidden_content'] + (int) $audit_item['hidden_meta'];
+                                        if ( $direct_count > 0 ) {
+                                            $other_parts[] = sprintf( __( 'Direct URL: %d', 'wp-filetrace' ), $direct_count );
+                                        }
+                                        if ( $related_count > 0 ) {
+                                            $other_parts[] = sprintf( __( 'Counter/info/link: %d', 'wp-filetrace' ), $related_count );
+                                        }
+                                        if ( $hidden_count > 0 ) {
+                                            $other_parts[] = sprintf( __( 'Hidden download: %d', 'wp-filetrace' ), $hidden_count );
+                                        }
+                                        ?>
+                                        <tr class="<?php echo ! empty( $audit_item['has_direct_reference'] ) ? 'has-reference' : 'no-reference'; ?>">
+                                            <td>
+                                                <?php if ( $sdm_edit_link ) : ?>
+                                                    <a class="wft-file-title" href="<?php echo esc_url( $sdm_edit_link ); ?>" target="_blank" rel="noopener noreferrer"><?php echo esc_html( $audit_item['title'] ); ?> ↗</a>
+                                                <?php else : ?>
+                                                    <strong><?php echo esc_html( $audit_item['title'] ); ?></strong>
+                                                <?php endif; ?>
+                                                <span class="wft-meta">#<?php echo (int) $audit_item['sdm_id']; ?></span>
+                                            </td>
+                                            <td><span class="wft-migration-badge"><?php echo esc_html( $audit_item['status'] ); ?></span></td>
+                                            <td>
+                                                <?php if ( ! empty( $audit_item['file_url'] ) ) : ?>
+                                                    <a href="<?php echo esc_url( $audit_item['file_url'] ); ?>" target="_blank" rel="noopener noreferrer"><?php echo esc_html( $audit_file_name ?: $audit_item['file_url'] ); ?> ↗</a>
+                                                <?php else : ?>
+                                                    <span class="wft-meta"><?php esc_html_e( 'No valid file URL', 'wp-filetrace' ); ?></span>
+                                                <?php endif; ?>
+                                            </td>
+                                            <td>
+                                                <strong><?php echo number_format_i18n( (int) $audit_item['standard_content'] + (int) $audit_item['standard_meta'] ); ?></strong>
+                                                <span class="wft-meta"><?php echo esc_html( sprintf( __( 'content %1$d · meta %2$d', 'wp-filetrace' ), (int) $audit_item['standard_content'], (int) $audit_item['standard_meta'] ) ); ?></span>
+                                            </td>
+                                            <td>
+                                                <?php if ( $other_parts ) : ?>
+                                                    <?php foreach ( $other_parts as $part ) : ?><span class="wft-meta wft-audit-ref-line"><?php echo esc_html( $part ); ?></span><?php endforeach; ?>
+                                                <?php else : ?>—<?php endif; ?>
+                                            </td>
+                                            <td>
+                                                <?php if ( ! empty( $audit_item['has_direct_reference'] ) ) : ?>
+                                                    <span class="wft-migration-badge is-ready"><?php esc_html_e( 'Reference Found', 'wp-filetrace' ); ?></span>
+                                                <?php else : ?>
+                                                    <span class="wft-migration-badge is-review"><?php esc_html_e( 'No Direct Reference Found', 'wp-filetrace' ); ?></span>
+                                                <?php endif; ?>
+                                            </td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    </details>
+                </section>
+            <?php endif; ?>
+
             <?php if ( $scan ) : ?>
                 <section class="wft-card wft-migration-results-card">
                     <div class="wft-card-heading">

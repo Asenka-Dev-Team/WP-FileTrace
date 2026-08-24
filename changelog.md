@@ -12,6 +12,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ### Fixed
 
+## [0.1.9] - 2026-08-24
+
+### Added
+
+- Added an **SDM Usage Audit** to the Simple Download Monitor migration dry run.
+- Added an inventory of all non-trashed SDM download records, separate from migration shortcode occurrences.
+- Added unique-ID reference counts for standard SDM download shortcodes, direct SDM process URLs, counter/info/link shortcodes, hidden-download shortcodes, and post-meta references.
+- Added a per-SDM-item audit table showing status, file destination, standard shortcode usage, other SDM reference types, and whether a direct ID reference was found.
+- Added detection of `[sdm_show_dl_from_category]` usage so the audit can warn when downloads may be exposed dynamically through category listings.
+- Added reporting for SDM items that no longer resolve to a valid HTTP/HTTPS file URL.
+
+### Changed
+
+- Bumped WP FileTrace to v0.1.9.
+- Expanded the migration dry-run summary to distinguish shortcode occurrences, unique SDM IDs, and unique WP FileTrace tracker destinations.
+- Uses the cautious label **No Direct Reference Found** instead of treating unmatched SDM records as unused/orphaned.
+- Updated README documentation for the expanded SDM audit workflow.
+
+### Fixed
+
+- Reduced ambiguity when an SDM installation contains substantially more download records than individual `[sdm_download]` shortcode occurrences.
+
 ## [0.1.8] - 2026-08-24
 
 ### Added

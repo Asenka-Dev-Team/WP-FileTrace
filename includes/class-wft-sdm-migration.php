@@ -101,15 +101,399 @@ final class WFT_SDM_Migration {
         }
 
         return array(
-            'items'              => $items,
-            'total'              => count( $items ),
-            'ready'              => $ready,
-            'review'             => $review,
-            'reuse'              => count( $reuse_ids ),
-            'create'             => count( $create_keys ),
-            'content_post_count' => count( $content_items ),
+            'items'                => $items,
+            'total'                => count( $items ),
+            'ready'                => $ready,
+            'review'               => $review,
+            'reuse'                => count( $reuse_ids ),
+            'create'               => count( $create_keys ),
+            'content_post_count'   => count( $content_items ),
             'meta_reference_count' => $meta_items,
-            'related_count'      => self::count_related_sdm_shortcodes(),
+            'related_count'        => self::count_related_sdm_shortcodes(),
+            'audit'                => self::build_usage_audit( $items ),
+        );
+    }
+
+    /**
+     * Inventory every SDM download record and compare it with known reference
+     * types. "No direct reference" intentionally does not mean "unused"; SDM
+     * category/listing shortcodes can expose items dynamically without placing
+     * the individual download ID in content.
+     */
+    private static function build_usage_audit( array $scan_items ): array {
+        global $wpdb;
+
+        $sdm_posts = $wpdb->get_results(
+            "SELECT ID, post_title, post_status
+             FROM {$wpdb->posts}
+             WHERE post_type = 'sdm_downloads'
+               AND post_status NOT IN ('trash', 'auto-draft')
+             ORDER BY post_title ASC, ID ASC"
+        ) ?: array();
+
+        $usage = array();
+        foreach ( $sdm_posts as $sdm_post ) {
+            $usage[ (int) $sdm_post->ID ] = array(
+                'standard_content' => 0,
+                'standard_meta'    => 0,
+                'direct_content'   => 0,
+                'direct_meta'      => 0,
+                'related_content'  => 0,
+                'related_meta'     => 0,
+                'hidden_content'   => 0,
+                'hidden_meta'      => 0,
+            );
+        }
+
+        foreach ( $scan_items as $item ) {
+            $id = absint( $item['sdm_id'] ?? 0 );
+            if ( $id <= 0 || ! isset( $usage[ $id ] ) ) {
+                continue;
+            }
+
+            if ( 'post_meta' === ( $item['source_type'] ?? '' ) ) {
+                ++$usage[ $id ]['standard_meta'];
+            } else {
+                ++$usage[ $id ]['standard_content'];
+            }
+        }
+
+        self::collect_id_shortcode_usage( $usage );
+        self::collect_direct_url_usage( $usage );
+
+        $category_listing = self::count_category_listing_shortcodes();
+        $status_counts    = array();
+        $items            = array();
+        $standard_ids     = array();
+        $direct_ids       = array();
+        $related_ids      = array();
+        $hidden_ids       = array();
+        $referenced_ids   = array();
+        $missing_file_url = 0;
+
+        $occurrences = array(
+            'standard_content' => 0,
+            'standard_meta'    => 0,
+            'direct_content'   => 0,
+            'direct_meta'      => 0,
+            'related_content'  => 0,
+            'related_meta'     => 0,
+            'hidden_content'   => 0,
+            'hidden_meta'      => 0,
+        );
+
+        foreach ( $sdm_posts as $sdm_post ) {
+            $id     = (int) $sdm_post->ID;
+            $counts = $usage[ $id ];
+
+            foreach ( $counts as $key => $count ) {
+                $occurrences[ $key ] += (int) $count;
+            }
+
+            $standard_total = (int) $counts['standard_content'] + (int) $counts['standard_meta'];
+            $direct_total   = (int) $counts['direct_content'] + (int) $counts['direct_meta'];
+            $related_total  = (int) $counts['related_content'] + (int) $counts['related_meta'];
+            $hidden_total   = (int) $counts['hidden_content'] + (int) $counts['hidden_meta'];
+            $reference_total = $standard_total + $direct_total + $related_total + $hidden_total;
+
+            if ( $standard_total > 0 ) {
+                $standard_ids[ $id ] = true;
+            }
+            if ( $direct_total > 0 ) {
+                $direct_ids[ $id ] = true;
+            }
+            if ( $related_total > 0 ) {
+                $related_ids[ $id ] = true;
+            }
+            if ( $hidden_total > 0 ) {
+                $hidden_ids[ $id ] = true;
+            }
+            if ( $reference_total > 0 ) {
+                $referenced_ids[ $id ] = true;
+            }
+
+            $status = sanitize_key( (string) $sdm_post->post_status );
+            if ( '' === $status ) {
+                $status = 'unknown';
+            }
+            $status_counts[ $status ] = ( $status_counts[ $status ] ?? 0 ) + 1;
+
+            $raw_url  = (string) get_post_meta( $id, 'sdm_upload', true );
+            $file_url = WFT_Downloads::normalize_url( $raw_url );
+            if ( '' === $file_url ) {
+                ++$missing_file_url;
+            }
+
+            $items[] = array(
+                'sdm_id'             => $id,
+                'title'              => '' !== trim( (string) $sdm_post->post_title ) ? (string) $sdm_post->post_title : sprintf( __( 'SDM item #%d', 'wp-filetrace' ), $id ),
+                'status'             => $status,
+                'file_url'           => $file_url,
+                'standard_content'   => (int) $counts['standard_content'],
+                'standard_meta'      => (int) $counts['standard_meta'],
+                'direct_content'     => (int) $counts['direct_content'],
+                'direct_meta'        => (int) $counts['direct_meta'],
+                'related_content'    => (int) $counts['related_content'],
+                'related_meta'       => (int) $counts['related_meta'],
+                'hidden_content'     => (int) $counts['hidden_content'],
+                'hidden_meta'        => (int) $counts['hidden_meta'],
+                'reference_total'    => $reference_total,
+                'has_direct_reference' => $reference_total > 0,
+            );
+        }
+
+        usort(
+            $items,
+            static function ( array $a, array $b ): int {
+                if ( $a['has_direct_reference'] !== $b['has_direct_reference'] ) {
+                    return $a['has_direct_reference'] ? 1 : -1;
+                }
+
+                $title_compare = strcasecmp( (string) $a['title'], (string) $b['title'] );
+                return 0 !== $title_compare ? $title_compare : ( (int) $a['sdm_id'] <=> (int) $b['sdm_id'] );
+            }
+        );
+
+        return array(
+            'total_items'                  => count( $sdm_posts ),
+            'status_counts'                => $status_counts,
+            'standard_shortcode_ids'       => count( $standard_ids ),
+            'direct_url_ids'               => count( $direct_ids ),
+            'related_shortcode_ids'        => count( $related_ids ),
+            'hidden_shortcode_ids'         => count( $hidden_ids ),
+            'referenced_ids'               => count( $referenced_ids ),
+            'no_direct_reference'          => max( 0, count( $sdm_posts ) - count( $referenced_ids ) ),
+            'missing_file_url'             => $missing_file_url,
+            'category_listing_occurrences' => (int) $category_listing['occurrences'],
+            'category_listing_locations'   => (int) $category_listing['locations'],
+            'occurrences'                  => $occurrences,
+            'items'                        => $items,
+        );
+    }
+
+    private static function collect_id_shortcode_usage( array &$usage ): void {
+        global $wpdb;
+
+        $tags = array( 'sdm_download_counter', 'sdm_show_download_info', 'sdm_download_link', 'sdm_hidden_download' );
+        $clauses = array();
+        $values  = array();
+        foreach ( $tags as $tag ) {
+            $clauses[] = 'post_content LIKE %s';
+            $values[]  = '%' . $wpdb->esc_like( '[' . $tag ) . '%';
+        }
+
+        $post_rows = $wpdb->get_results(
+            $wpdb->prepare(
+                "SELECT ID, post_content AS ref_value
+                 FROM {$wpdb->posts}
+                 WHERE (" . implode( ' OR ', $clauses ) . ")
+                   AND post_status NOT IN ('trash', 'auto-draft', 'inherit')
+                   AND post_type NOT IN ('revision', 'attachment', 'sdm_downloads')",
+                $values
+            )
+        ) ?: array();
+
+        foreach ( $post_rows as $row ) {
+            self::apply_id_shortcode_counts( $usage, (string) $row->ref_value, 'content', $tags );
+        }
+
+        $meta_clauses = array();
+        $meta_values  = array();
+        foreach ( $tags as $tag ) {
+            $meta_clauses[] = 'pm.meta_value LIKE %s';
+            $meta_values[]  = '%' . $wpdb->esc_like( '[' . $tag ) . '%';
+        }
+
+        $meta_rows = $wpdb->get_results(
+            $wpdb->prepare(
+                "SELECT pm.meta_value AS ref_value
+                 FROM {$wpdb->postmeta} pm
+                 INNER JOIN {$wpdb->posts} p ON p.ID = pm.post_id
+                 WHERE (" . implode( ' OR ', $meta_clauses ) . ")
+                   AND pm.meta_key <> %s
+                   AND p.post_status NOT IN ('trash', 'auto-draft', 'inherit')
+                   AND p.post_type NOT IN ('revision', 'attachment', 'sdm_downloads')",
+                array_merge( $meta_values, array( self::BACKUP_META ) )
+            )
+        ) ?: array();
+
+        foreach ( $meta_rows as $row ) {
+            self::apply_id_shortcode_counts( $usage, (string) $row->ref_value, 'meta', $tags );
+        }
+    }
+
+    private static function apply_id_shortcode_counts( array &$usage, string $content, string $source, array $tags ): void {
+        foreach ( self::find_id_shortcodes( $content, $tags ) as $reference ) {
+            $id = absint( $reference['id'] ?? 0 );
+            if ( $id <= 0 || ! isset( $usage[ $id ] ) ) {
+                continue;
+            }
+
+            $tag = (string) ( $reference['tag'] ?? '' );
+            $bucket = 'sdm_hidden_download' === $tag ? 'hidden_' . $source : 'related_' . $source;
+            ++$usage[ $id ][ $bucket ];
+        }
+    }
+
+    private static function find_id_shortcodes( string $content, array $tags ): array {
+        if ( '' === $content ) {
+            return array();
+        }
+
+        $pattern = get_shortcode_regex( $tags );
+        if ( ! preg_match_all( '/' . $pattern . '/s', $content, $matches, PREG_SET_ORDER ) ) {
+            return array();
+        }
+
+        $references = array();
+        foreach ( $matches as $match ) {
+            if ( '[' === ( $match[1] ?? '' ) && ']' === ( $match[6] ?? '' ) ) {
+                continue;
+            }
+
+            $attrs = shortcode_parse_atts( (string) ( $match[3] ?? '' ) );
+            $attrs = is_array( $attrs ) ? array_change_key_case( $attrs, CASE_LOWER ) : array();
+            $id    = isset( $attrs['id'] ) && is_numeric( $attrs['id'] ) ? absint( $attrs['id'] ) : 0;
+            if ( $id <= 0 ) {
+                continue;
+            }
+
+            $references[] = array(
+                'tag' => (string) ( $match[2] ?? '' ),
+                'id'  => $id,
+            );
+        }
+
+        return $references;
+    }
+
+    private static function collect_direct_url_usage( array &$usage ): void {
+        global $wpdb;
+
+        $like_a = '%' . $wpdb->esc_like( 'sdm_process_download' ) . '%';
+        $like_b = '%' . $wpdb->esc_like( 'smd_process_download' ) . '%';
+
+        $post_rows = $wpdb->get_results(
+            $wpdb->prepare(
+                "SELECT post_content AS ref_value
+                 FROM {$wpdb->posts}
+                 WHERE (post_content LIKE %s OR post_content LIKE %s)
+                   AND post_status NOT IN ('trash', 'auto-draft', 'inherit')
+                   AND post_type NOT IN ('revision', 'attachment', 'sdm_downloads')",
+                $like_a,
+                $like_b
+            )
+        ) ?: array();
+
+        foreach ( $post_rows as $row ) {
+            foreach ( self::find_direct_process_ids( (string) $row->ref_value ) as $id ) {
+                if ( isset( $usage[ $id ] ) ) {
+                    ++$usage[ $id ]['direct_content'];
+                }
+            }
+        }
+
+        $meta_rows = $wpdb->get_results(
+            $wpdb->prepare(
+                "SELECT pm.meta_value AS ref_value
+                 FROM {$wpdb->postmeta} pm
+                 INNER JOIN {$wpdb->posts} p ON p.ID = pm.post_id
+                 WHERE (pm.meta_value LIKE %s OR pm.meta_value LIKE %s)
+                   AND pm.meta_key <> %s
+                   AND p.post_status NOT IN ('trash', 'auto-draft', 'inherit')
+                   AND p.post_type NOT IN ('revision', 'attachment', 'sdm_downloads')",
+                $like_a,
+                $like_b,
+                self::BACKUP_META
+            )
+        ) ?: array();
+
+        foreach ( $meta_rows as $row ) {
+            foreach ( self::find_direct_process_ids( (string) $row->ref_value ) as $id ) {
+                if ( isset( $usage[ $id ] ) ) {
+                    ++$usage[ $id ]['direct_meta'];
+                }
+            }
+        }
+    }
+
+    private static function find_direct_process_ids( string $content ): array {
+        if ( '' === $content || ( false === stripos( $content, 'sdm_process_download' ) && false === stripos( $content, 'smd_process_download' ) ) ) {
+            return array();
+        }
+
+        $ids = array();
+        $patterns = array(
+            '~(?:sdm|smd)_process_download(?:=|%3D)1[^\s"\'<>]{0,500}?download_id(?:=|%3D)(\d+)~i',
+            '~download_id(?:=|%3D)(\d+)[^\s"\'<>]{0,500}?(?:sdm|smd)_process_download(?:=|%3D)1~i',
+        );
+
+        foreach ( $patterns as $pattern ) {
+            if ( preg_match_all( $pattern, $content, $matches ) ) {
+                foreach ( $matches[1] as $id ) {
+                    $id = absint( $id );
+                    if ( $id > 0 ) {
+                        $ids[] = $id;
+                    }
+                }
+            }
+        }
+
+        return $ids;
+    }
+
+    private static function count_category_listing_shortcodes(): array {
+        global $wpdb;
+
+        $needle = '[sdm_show_dl_from_category';
+        $like   = '%' . $wpdb->esc_like( $needle ) . '%';
+        $occurrences = 0;
+        $locations   = 0;
+
+        $post_rows = $wpdb->get_col(
+            $wpdb->prepare(
+                "SELECT post_content
+                 FROM {$wpdb->posts}
+                 WHERE post_content LIKE %s
+                   AND post_status NOT IN ('trash', 'auto-draft', 'inherit')
+                   AND post_type NOT IN ('revision', 'attachment', 'sdm_downloads')",
+                $like
+            )
+        ) ?: array();
+
+        foreach ( $post_rows as $value ) {
+            $count = substr_count( strtolower( (string) $value ), $needle );
+            if ( $count > 0 ) {
+                $occurrences += $count;
+                ++$locations;
+            }
+        }
+
+        $meta_rows = $wpdb->get_col(
+            $wpdb->prepare(
+                "SELECT pm.meta_value
+                 FROM {$wpdb->postmeta} pm
+                 INNER JOIN {$wpdb->posts} p ON p.ID = pm.post_id
+                 WHERE pm.meta_value LIKE %s
+                   AND pm.meta_key <> %s
+                   AND p.post_status NOT IN ('trash', 'auto-draft', 'inherit')
+                   AND p.post_type NOT IN ('revision', 'attachment', 'sdm_downloads')",
+                $like,
+                self::BACKUP_META
+            )
+        ) ?: array();
+
+        foreach ( $meta_rows as $value ) {
+            $count = substr_count( strtolower( (string) $value ), $needle );
+            if ( $count > 0 ) {
+                $occurrences += $count;
+                ++$locations;
+            }
+        }
+
+        return array(
+            'occurrences' => $occurrences,
+            'locations'   => $locations,
         );
     }
 

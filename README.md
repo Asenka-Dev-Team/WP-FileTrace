@@ -157,7 +157,11 @@ The **Migration (Beta)** tab provides a Simple Download Monitor migration assist
 
 Rows are marked **Ready** only when WP FileTrace can perform a conservative one-to-one migration. Password-protected/unpublished SDM items, behavior-changing unsupported shortcode attributes, and globally enabled SDM Terms & Conditions or reCAPTCHA are marked **Needs Review** and are not auto-migrated. `fancy` templates can be migrated, but their SDM template presentation is replaced by the normal WP FileTrace download button and is called out in the dry-run notes.
 
-Shortcode references found in post meta/page-builder data are report-only and are never automatically edited. SDM counter/info/category shortcodes and direct SDM process URLs are outside this migration pass.
+Shortcode references found in post meta/page-builder data are report-only and are never automatically edited. SDM counter/info/category shortcodes and direct SDM process URLs are outside the automatic replacement pass.
+
+Beginning with v0.1.9, the dry run also includes an **SDM Usage Audit**. The audit inventories all non-trashed SDM download records separately from migration shortcode occurrences and reports how many unique SDM IDs are referenced by standard download shortcodes, direct SDM process URLs, counter/info/link shortcodes, hidden-download shortcodes, and post-meta references. It also lists records where no direct ID reference was found. These records are deliberately labeled **No Direct Reference Found**, not unused, because SDM category/listing shortcodes such as `[sdm_show_dl_from_category]` can expose many downloads dynamically without embedding each individual item ID.
+
+The audit helps explain common differences such as dozens of visible shortcode occurrences versus hundreds of SDM download records, and also distinguishes repeated shortcode uses from the smaller number of unique WP FileTrace tracker destinations that will be created or reused.
 
 **Apply Safe Replacements** creates or reuses the corresponding WP FileTrace tracker and updates only Ready shortcodes in `post_content`. Before the first change to each content item, WP FileTrace stores an internal rollback copy of its original `post_content`. **Roll Back Content Changes** restores those backups; tracker records are intentionally left in place because they may have existed before migration or may already contain download activity. Once the migration has been verified, **Discard Rollback Backup** removes the temporary backups without changing current content.
 
@@ -199,7 +203,7 @@ Release workflow:
 
 1. Update the plugin version and `changelog.md`.
 2. Commit and push the version to GitHub.
-3. Create a GitHub Release with a matching tag such as `v0.1.8`.
+3. Create a GitHub Release with a matching tag such as `v0.1.9`.
 4. Publish the release as a normal release, not a draft or prerelease.
 
 Beginning with v0.1.5, no manually uploaded release ZIP is required. The updater uses GitHub's automatically generated release source ZIP and normalizes its extracted repository directory back to `wp-filetrace/` during the WordPress upgrade process.
