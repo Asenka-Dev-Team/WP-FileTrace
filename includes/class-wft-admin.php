@@ -337,14 +337,15 @@ final class WFT_Admin {
             $notice = 'event_cleared';
         } else {
             $global_snippet = isset( $_POST['wft_ga_global_snippet'] ) ? (string) wp_unslash( $_POST['wft_ga_global_snippet'] ) : '';
-            $event_snippet  = isset( $_POST['wft_ga_event_snippet'] ) ? (string) wp_unslash( $_POST['wft_ga_event_snippet'] ) : '';
-            $file_parameter = isset( $_POST['wft_ga_filename_parameter'] ) ? sanitize_text_field( wp_unslash( $_POST['wft_ga_filename_parameter'] ) ) : '';
+            $event_snippet        = isset( $_POST['wft_ga_event_snippet'] ) ? (string) wp_unslash( $_POST['wft_ga_event_snippet'] ) : '';
+            $download_id_parameter = isset( $_POST['wft_ga_download_id_parameter'] ) ? sanitize_text_field( wp_unslash( $_POST['wft_ga_download_id_parameter'] ) ) : '';
+            $file_parameter        = isset( $_POST['wft_ga_filename_parameter'] ) ? sanitize_text_field( wp_unslash( $_POST['wft_ga_filename_parameter'] ) ) : '';
 
             if ( ( '' !== trim( $global_snippet ) || '' !== trim( $event_snippet ) ) && ! current_user_can( 'unfiltered_html' ) ) {
                 wp_send_json_error( array( 'message' => __( 'Your account is not allowed to save executable analytics snippets.', 'wp-filetrace' ) ), 403 );
             }
 
-            WFT_Analytics::save_settings( $global_snippet, $event_snippet, $file_parameter );
+            WFT_Analytics::save_settings( $global_snippet, $event_snippet, $download_id_parameter, $file_parameter );
         }
 
         self::ajax_send_page(
@@ -700,14 +701,15 @@ final class WFT_Admin {
             $notice = 'event_cleared';
         } else {
             $global_snippet = isset( $_POST['wft_ga_global_snippet'] ) ? (string) wp_unslash( $_POST['wft_ga_global_snippet'] ) : '';
-            $event_snippet  = isset( $_POST['wft_ga_event_snippet'] ) ? (string) wp_unslash( $_POST['wft_ga_event_snippet'] ) : '';
-            $file_parameter = isset( $_POST['wft_ga_filename_parameter'] ) ? sanitize_text_field( wp_unslash( $_POST['wft_ga_filename_parameter'] ) ) : '';
+            $event_snippet        = isset( $_POST['wft_ga_event_snippet'] ) ? (string) wp_unslash( $_POST['wft_ga_event_snippet'] ) : '';
+            $download_id_parameter = isset( $_POST['wft_ga_download_id_parameter'] ) ? sanitize_text_field( wp_unslash( $_POST['wft_ga_download_id_parameter'] ) ) : '';
+            $file_parameter        = isset( $_POST['wft_ga_filename_parameter'] ) ? sanitize_text_field( wp_unslash( $_POST['wft_ga_filename_parameter'] ) ) : '';
 
             if ( ( '' !== trim( $global_snippet ) || '' !== trim( $event_snippet ) ) && ! current_user_can( 'unfiltered_html' ) ) {
                 wp_die( esc_html__( 'Your account is not allowed to save executable analytics snippets.', 'wp-filetrace' ) );
             }
 
-            WFT_Analytics::save_settings( $global_snippet, $event_snippet, $file_parameter );
+            WFT_Analytics::save_settings( $global_snippet, $event_snippet, $download_id_parameter, $file_parameter );
         }
 
         wp_safe_redirect(
@@ -893,8 +895,9 @@ final class WFT_Admin {
 
     private static function render_analytics_page(): void {
         $global_snippet = WFT_Analytics::get_global_snippet();
-        $event_snippet  = WFT_Analytics::get_event_snippet();
-        $file_parameter = WFT_Analytics::get_filename_parameter();
+        $event_snippet         = WFT_Analytics::get_event_snippet();
+        $download_id_parameter = WFT_Analytics::get_download_id_parameter();
+        $file_parameter        = WFT_Analytics::get_filename_parameter();
         $notice         = isset( $_GET['wft_analytics_notice'] ) ? sanitize_key( wp_unslash( $_GET['wft_analytics_notice'] ) ) : '';
         ?>
         <div class="wrap wft-wrap">
@@ -920,7 +923,7 @@ final class WFT_Admin {
                         if ( 'global_cleared' === $notice ) {
                             esc_html_e( 'Global analytics snippet cleared.', 'wp-filetrace' );
                         } elseif ( 'event_cleared' === $notice ) {
-                            esc_html_e( 'Download-event snippet and file-name parameter cleared.', 'wp-filetrace' );
+                            esc_html_e( 'Download-event snippet and dynamic parameter mappings cleared.', 'wp-filetrace' );
                         } else {
                             esc_html_e( 'Analytics settings saved.', 'wp-filetrace' );
                         }
@@ -970,15 +973,23 @@ final class WFT_Admin {
                             </span>
                         </div>
                         <label class="screen-reader-text" for="wft-ga-event-snippet"><?php esc_html_e( 'Download Event code', 'wp-filetrace' ); ?></label>
-                        <textarea id="wft-ga-event-snippet" class="wft-code-textarea" name="wft_ga_event_snippet" rows="10" spellcheck="false" placeholder="gtag('event', 'file_download', {&#10;    'file_source': 'WP FileTrace'&#10;});"><?php echo esc_textarea( $event_snippet ); ?></textarea>
+                        <textarea id="wft-ga-event-snippet" class="wft-code-textarea" name="wft_ga_event_snippet" rows="10" spellcheck="false" placeholder="gtag('event', 'haver_download', {&#10;    'download_id': '&lt;&lt;INSERT ID HERE&gt;&gt;',&#10;    'download_name': '&lt;&lt;INSERT NAME HERE&gt;&gt;'&#10;});"><?php echo esc_textarea( $event_snippet ); ?></textarea>
                         <p class="description"><?php esc_html_e( 'A surrounding <script> tag is optional for this field. WP FileTrace executes the event during a short browser handoff and then continues to the requested file.', 'wp-filetrace' ); ?></p>
+                    </div>
+
+                    <div class="wft-analytics-section wft-analytics-parameter-section">
+                        <label for="wft-ga-download-id-parameter"><?php esc_html_e( 'Download ID Event Parameter', 'wp-filetrace' ); ?></label>
+                        <input type="text" id="wft-ga-download-id-parameter" name="wft_ga_download_id_parameter" value="<?php echo esc_attr( $download_id_parameter ); ?>" placeholder="download_id">
+                        <p class="description">
+                            <?php esc_html_e( 'Optional. Enter the gtag event parameter that should receive the stable WP FileTrace tracker ID. If your event snippet already sets that parameter, WP FileTrace overwrites its value for the download event. Example: download_id.', 'wp-filetrace' ); ?>
+                        </p>
                     </div>
 
                     <div class="wft-analytics-section wft-analytics-parameter-section">
                         <label for="wft-ga-filename-parameter"><?php esc_html_e( 'File Name Event Parameter', 'wp-filetrace' ); ?></label>
                         <input type="text" id="wft-ga-filename-parameter" name="wft_ga_filename_parameter" value="<?php echo esc_attr( $file_parameter ); ?>" placeholder="file_name">
                         <p class="description">
-                            <?php esc_html_e( 'Optional. Enter the gtag event parameter that should receive the actual downloaded file name. If your event snippet already sets that parameter, WP FileTrace overwrites its value for the download event. Examples: file_name or value.', 'wp-filetrace' ); ?>
+                            <?php esc_html_e( 'Optional. Enter the gtag event parameter that should receive the actual downloaded file name. If your event snippet already sets that parameter, WP FileTrace overwrites its value for the download event. Examples: download_name, file_name, or value.', 'wp-filetrace' ); ?>
                         </p>
                     </div>
 

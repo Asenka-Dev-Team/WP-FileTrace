@@ -844,6 +844,7 @@
   }
 }
 
+
 /* v0.1.7 AJAX admin UX */
 .wft-wrap.is-wft-ajax-busy {
   cursor: progress;
@@ -990,22 +991,12 @@
   vertical-align: top;
 }
 
-.wft-migration-table td:nth-child(1) {
-  min-width: 180px;
-}
-.wft-migration-table td:nth-child(2) {
-  min-width: 130px;
-}
-.wft-migration-table td:nth-child(3) {
-  min-width: 160px;
-}
+.wft-migration-table td:nth-child(1) { min-width: 180px; }
+.wft-migration-table td:nth-child(2) { min-width: 130px; }
+.wft-migration-table td:nth-child(3) { min-width: 160px; }
 .wft-migration-table td:nth-child(4),
-.wft-migration-table td:nth-child(5) {
-  min-width: 210px;
-}
-.wft-migration-table td:nth-child(7) {
-  min-width: 250px;
-}
+.wft-migration-table td:nth-child(5) { min-width: 210px; }
+.wft-migration-table td:nth-child(7) { min-width: 250px; }
 
 .wft-migration-code {
   display: inline-block;
@@ -1069,6 +1060,7 @@
   }
 }
 
+
 /* v0.1.8 beta feature settings */
 .wft-settings-card {
   max-width: 920px;
@@ -1101,7 +1093,7 @@
   color: #1d2327;
   font-size: 10px;
   font-weight: 700;
-  letter-spacing: 0.06em;
+  letter-spacing: .06em;
   line-height: 1.6;
 }
 
@@ -1145,14 +1137,15 @@
   margin-top: 0;
 }
 
+
 .wft-settings-subsection {
-  margin-top: 24px;
-  padding-top: 20px;
-  border-top: 1px solid #dcdcde;
+    margin-top: 24px;
+    padding-top: 20px;
+    border-top: 1px solid #dcdcde;
 }
 
 .wft-settings-subsection h3 {
-  margin: 4px 0 6px;
+    margin: 4px 0 6px;
 }
 
 /* v0.1.9 SDM usage audit */
@@ -1180,21 +1173,11 @@
   vertical-align: top;
 }
 
-.wft-audit-table td:nth-child(1) {
-  min-width: 190px;
-}
-.wft-audit-table td:nth-child(3) {
-  min-width: 170px;
-}
-.wft-audit-table td:nth-child(4) {
-  min-width: 140px;
-}
-.wft-audit-table td:nth-child(5) {
-  min-width: 160px;
-}
-.wft-audit-table td:nth-child(6) {
-  min-width: 170px;
-}
+.wft-audit-table td:nth-child(1) { min-width: 190px; }
+.wft-audit-table td:nth-child(3) { min-width: 170px; }
+.wft-audit-table td:nth-child(4) { min-width: 140px; }
+.wft-audit-table td:nth-child(5) { min-width: 160px; }
+.wft-audit-table td:nth-child(6) { min-width: 170px; }
 
 .wft-audit-ref-line {
   display: block;

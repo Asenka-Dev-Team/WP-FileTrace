@@ -11,8 +11,9 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 final class WFT_Analytics {
     public const OPTION_GLOBAL_SNIPPET = 'wft_ga_global_snippet';
-    public const OPTION_EVENT_SNIPPET  = 'wft_ga_event_snippet';
-    public const OPTION_FILENAME_PARAM = 'wft_ga_filename_parameter';
+    public const OPTION_EVENT_SNIPPET      = 'wft_ga_event_snippet';
+    public const OPTION_DOWNLOAD_ID_PARAM = 'wft_ga_download_id_parameter';
+    public const OPTION_FILENAME_PARAM     = 'wft_ga_filename_parameter';
 
     /**
      * Register frontend analytics output.
@@ -29,6 +30,10 @@ final class WFT_Analytics {
         return (string) get_option( self::OPTION_EVENT_SNIPPET, '' );
     }
 
+    public static function get_download_id_parameter(): string {
+        return self::sanitize_parameter_name( (string) get_option( self::OPTION_DOWNLOAD_ID_PARAM, '' ) );
+    }
+
     public static function get_filename_parameter(): string {
         return self::sanitize_parameter_name( (string) get_option( self::OPTION_FILENAME_PARAM, '' ) );
     }
@@ -43,9 +48,10 @@ final class WFT_Analytics {
      * Snippets are intentionally stored verbatim. Only trusted administrators
      * with unfiltered_html should be allowed to configure executable scripts.
      */
-    public static function save_settings( string $global_snippet, string $event_snippet, string $filename_parameter ): void {
+    public static function save_settings( string $global_snippet, string $event_snippet, string $download_id_parameter, string $filename_parameter ): void {
         update_option( self::OPTION_GLOBAL_SNIPPET, $global_snippet, false );
         update_option( self::OPTION_EVENT_SNIPPET, $event_snippet, false );
+        update_option( self::OPTION_DOWNLOAD_ID_PARAM, self::sanitize_parameter_name( $download_id_parameter ), false );
         update_option( self::OPTION_FILENAME_PARAM, self::sanitize_parameter_name( $filename_parameter ), false );
     }
 
@@ -55,6 +61,7 @@ final class WFT_Analytics {
 
     public static function clear_event_settings(): void {
         delete_option( self::OPTION_EVENT_SNIPPET );
+        delete_option( self::OPTION_DOWNLOAD_ID_PARAM );
         delete_option( self::OPTION_FILENAME_PARAM );
     }
 
@@ -96,27 +103,42 @@ final class WFT_Analytics {
             return;
         }
 
-        $destination = esc_url_raw( (string) $tracker->file_url );
-        $parameter   = self::get_filename_parameter();
-        $file_name   = self::downloaded_file_name( $tracker );
-        $source      = WFT_Downloads::sanitize_source( $source );
+        $destination          = esc_url_raw( (string) $tracker->file_url );
+        $download_id          = (int) $tracker->id;
+        $download_id_parameter = self::get_download_id_parameter();
+        $filename_parameter   = self::get_filename_parameter();
+        $file_name            = self::downloaded_file_name( $tracker );
+        $source               = WFT_Downloads::sanitize_source( $source );
 
         $context = apply_filters(
             'wft_analytics_event_context',
             array(
-                'download_id' => (int) $tracker->id,
-                'file_name'   => $file_name,
-                'file_url'    => $destination,
-                'source'      => $source,
-                'parameter'   => $parameter,
+                'download_id'        => $download_id,
+                'file_name'          => $file_name,
+                'file_url'           => $destination,
+                'source'             => $source,
+                // `parameter` is retained for backwards compatibility with the v0.1.5 filter shape.
+                'parameter'          => $filename_parameter,
+                'filename_parameter' => $filename_parameter,
+                'id_parameter'       => $download_id_parameter,
             ),
             $tracker,
             $source
         );
 
         if ( is_array( $context ) ) {
-            $file_name = isset( $context['file_name'] ) ? sanitize_text_field( (string) $context['file_name'] ) : $file_name;
-            $parameter = isset( $context['parameter'] ) ? self::sanitize_parameter_name( (string) $context['parameter'] ) : $parameter;
+            $download_id = isset( $context['download_id'] ) ? absint( $context['download_id'] ) : $download_id;
+            $file_name   = isset( $context['file_name'] ) ? sanitize_text_field( (string) $context['file_name'] ) : $file_name;
+
+            if ( isset( $context['filename_parameter'] ) ) {
+                $filename_parameter = self::sanitize_parameter_name( (string) $context['filename_parameter'] );
+            } elseif ( isset( $context['parameter'] ) ) {
+                $filename_parameter = self::sanitize_parameter_name( (string) $context['parameter'] );
+            }
+
+            $download_id_parameter = isset( $context['id_parameter'] )
+                ? self::sanitize_parameter_name( (string) $context['id_parameter'] )
+                : $download_id_parameter;
         }
 
         status_header( 200 );
@@ -144,8 +166,10 @@ final class WFT_Analytics {
         'use strict';
 
         var destination = <?php echo wp_json_encode( $destination ); ?>;
+        var downloadId = <?php echo wp_json_encode( $download_id ); ?>;
+        var downloadIdParameter = <?php echo wp_json_encode( $download_id_parameter ); ?>;
         var fileName = <?php echo wp_json_encode( $file_name ); ?>;
-        var fileParameter = <?php echo wp_json_encode( $parameter ); ?>;
+        var fileParameter = <?php echo wp_json_encode( $filename_parameter ); ?>;
         var redirected = false;
 
         function continueToDownload() {
@@ -165,7 +189,7 @@ final class WFT_Analytics {
 
         var baseGtag = window.gtag;
 
-        if ( fileParameter ) {
+        if ( downloadIdParameter || fileParameter ) {
             window.gtag = function () {
                 var args = Array.prototype.slice.call(arguments);
 
@@ -178,7 +202,14 @@ final class WFT_Analytics {
                         });
                     }
 
-                    eventParams[fileParameter] = fileName;
+                    if ( downloadIdParameter ) {
+                        eventParams[downloadIdParameter] = downloadId;
+                    }
+
+                    if ( fileParameter ) {
+                        eventParams[fileParameter] = fileName;
+                    }
+
                     args[2] = eventParams;
                 }
 

@@ -12,6 +12,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ### Fixed
 
+## [0.1.10] - 2026-08-24
+
+### Added
+
+- Added an optional **Download ID Event Parameter** mapping for Google Analytics / `gtag` download events.
+- Added automatic injection of the stable WP FileTrace tracker ID into the configured event parameter.
+- Added support for using both dynamic tracker-ID and file-name parameters in the same custom event, including events that contain placeholder values.
+
+### Changed
+
+- Bumped WP FileTrace to v0.1.10.
+- Expanded the Analytics tab example and documentation for paired `download_id` / `download_name` event data.
+- Expanded `wft_analytics_event_context` so developers can adjust the download ID and both dynamic parameter names before the browser handoff is rendered while retaining the legacy filename `parameter` key for compatibility.
+- Updated uninstall cleanup to remove the saved Download ID parameter setting.
+
+### Fixed
+
+- Preserved the admin migration-action Dashicon centering adjustment in the packaged source.
+
 ## [0.1.9] - 2026-08-24
 
 ### Added

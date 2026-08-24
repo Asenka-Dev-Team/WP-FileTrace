@@ -34,7 +34,7 @@ Primary Developer: **Brian McLendon** - [u/eyeofbri](https://github.com/eyeofbri
 - Provide the `wft_download_tracked` action hook for custom integrations.
 - Optionally inject a complete global Google/site tag into frontend page `<head>` output.
 - Optionally execute custom `gtag('event', ...)` JavaScript when a tracked download is recorded.
-- Optionally overwrite a chosen event parameter with the actual downloaded file name.
+- Optionally overwrite chosen event parameters with the stable WP FileTrace tracker ID and/or the actual downloaded file name.
 - Support the analytics event flow for both shortcode and external/email tracked links.
 - Include a temporary 200-row synthetic test-data generator for pagination and sorting tests.
 - Check GitHub Releases for new WP FileTrace versions and surface updates through the normal WordPress plugin updater.
@@ -113,17 +113,38 @@ The event code runs after WP FileTrace successfully increments a tracked downloa
 
 When Download Event code is configured, WP FileTrace briefly serves a lightweight browser handoff page so the event has an opportunity to run before the visitor is redirected to the actual file. When no Download Event code is configured, WP FileTrace retains its normal direct redirect behavior.
 
+#### Download ID Event Parameter
+
+Optionally enter a parameter name such as:
+
+```text
+download_id
+```
+
+WP FileTrace will add that parameter to each `gtag('event', ...)` call in the configured Download Event snippet and set its value to the stable WP FileTrace tracker ID. If the event snippet already contains the same parameter, WP FileTrace overwrites that value for the tracked download.
+
 #### File Name Event Parameter
 
 Optionally enter a parameter name such as:
 
 ```text
-file_name
+download_name
 ```
 
 WP FileTrace will add that parameter to each `gtag('event', ...)` call in the configured Download Event snippet and set its value to the actual downloaded file name. If the event snippet already contains the same parameter, WP FileTrace overwrites that value for the tracked download.
 
-The Global Site Tag and Download Event settings are independent. Either can be configured without the other.
+For example, the following administrator-provided event can keep placeholder values in the saved snippet:
+
+```js
+gtag('event', 'haver_download', {
+    'download_id': '<<INSERT ID HERE>>',
+    'download_name': '<<INSERT NAME HERE>>'
+});
+```
+
+Set **Download ID Event Parameter** to `download_id` and **File Name Event Parameter** to `download_name`; WP FileTrace replaces both values when the tracked event runs.
+
+The Global Site Tag, Download Event, and both dynamic parameter mappings remain optional. The Global Site Tag and Download Event can still be configured independently.
 
 ### Updates
 
@@ -203,7 +224,7 @@ Release workflow:
 
 1. Update the plugin version and `changelog.md`.
 2. Commit and push the version to GitHub.
-3. Create a GitHub Release with a matching tag such as `v0.1.9`.
+3. Create a GitHub Release with a matching tag such as `v0.1.10`.
 4. Publish the release as a normal release, not a draft or prerelease.
 
 Beginning with v0.1.5, no manually uploaded release ZIP is required. The updater uses GitHub's automatically generated release source ZIP and normalizes its extracted repository directory back to `wp-filetrace/` during the WordPress upgrade process.
