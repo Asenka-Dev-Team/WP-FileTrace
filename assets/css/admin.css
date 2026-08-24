@@ -1187,3 +1187,119 @@
 .wft-audit-table tr.no-reference td {
   border-top-color: #e6d7ae;
 }
+
+/* v0.1.11 download-page editor. */
+.wft-download-page-card {
+  max-width: 1180px;
+}
+
+.wft-download-page-intro {
+  max-width: 920px;
+  margin: -4px 0 18px;
+  color: #667085;
+}
+
+.wft-download-page-note {
+  margin-bottom: 20px;
+  padding: 13px 14px;
+  border-left: 3px solid #7891ae;
+  border-radius: 4px 8px 8px 4px;
+  background: #f3f7fb;
+  color: #526172;
+  font-size: 12px;
+}
+
+.wft-preview-button,
+.wft-update-actions .button-primary {
+  display: inline-flex !important;
+  align-items: center;
+  gap: 5px;
+}
+
+.wft-preview-button .dashicons {
+  width: 16px;
+  height: 16px;
+  font-size: 16px;
+  line-height: 16px;
+}
+
+.wft-download-page-form {
+  display: grid;
+  gap: 20px;
+}
+
+.wft-download-page-editor-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.wft-download-page-editor {
+  min-width: 0;
+  padding: 18px;
+  border: 1px solid #dfe4ea;
+  border-radius: 9px;
+  background: linear-gradient(180deg, #fcfdfe 0%, #f8fafc 100%);
+}
+
+.wft-download-page-editor > label {
+  display: block;
+  margin-bottom: 5px;
+  color: #1f2937;
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.wft-download-page-editor > .description {
+  min-height: 48px;
+  margin: 0 0 12px;
+}
+
+.wft-template-variables {
+  padding: 18px;
+  border: 1px solid #dfe4ea;
+  border-radius: 9px;
+  background: #fff;
+}
+
+.wft-template-variable-grid {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 9px 16px;
+  align-items: baseline;
+}
+
+.wft-template-variable-grid code {
+  padding: 3px 6px;
+  border-radius: 5px;
+  background: #f2f4f7;
+  color: #344054;
+  font-size: 12px;
+}
+
+.wft-template-variable-grid span {
+  color: #667085;
+  font-size: 12px;
+}
+
+.wft-download-page-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+@media (max-width: 900px) {
+  .wft-download-page-editor-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .wft-download-page-editor > .description {
+    min-height: 0;
+  }
+}
+
+@media (max-width: 600px) {
+  .wft-template-variable-grid {
+    grid-template-columns: 1fr;
+  }
+}

@@ -12,6 +12,32 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ### Fixed
 
+## [0.1.11] - 2026-08-24
+
+### Added
+
+- Added a dedicated **Download Page** admin tab for white-labeling the frontend tracked-download handoff with optional custom HTML and CSS.
+- Added a safer administrator-only **Preview Saved Page** mode that uses sample values and does not increment download counters, start a file download, or execute the configured custom `gtag` download event.
+- Added download-page template variables for `{{download_name}}`, `{{file_name}}`, `{{download_url}}`, `{{download_source}}`, and `{{site_name}}`.
+- Added an improved built-in download handoff page with centered flex layout, minimal card styling, loading indicator, automatic download start, and a delayed manual-download fallback.
+- Added a dedicated no-track `/retry/` route used by automatic and manual handoff-page downloads so retrying does not increment counters or fire analytics again.
+- Added an optional **Download Source Event Parameter** mapping for Google Analytics / `gtag` events, reporting `shortcode` or `external` to match WP FileTrace's existing source counters.
+- Added automatic rewrite-rule version refresh so the new retry route is registered after plugin updates without requiring a manual permalink save.
+
+### Changed
+
+- Bumped WP FileTrace to v0.1.11.
+- Moved GitHub update diagnostics and **Check for Updates** from the standalone Updates tab into **Settings**.
+- Successfully tracked downloads now use the handoff page even when no custom analytics event is configured; analytics remains optional.
+- Expanded `wft_analytics_event_context` with the configured source parameter while retaining previous filter keys for compatibility.
+- Updated README documentation for download-page customization, preview/retry behavior, source analytics, and the relocated updater controls.
+- Updated uninstall cleanup for download-page settings, download-source analytics mapping, and rewrite-version state.
+- Removed unused pre-v0.1.2 ADT class source files from the packaged plugin while retaining legacy-data uninstall cleanup.
+
+### Fixed
+
+- Prevented delayed/manual handoff-page retries from creating duplicate WP FileTrace counts or duplicate custom analytics events.
+
 ## [0.1.10] - 2026-08-24
 
 ### Added

@@ -476,6 +476,14 @@
         });
     });
 
+    $(document).on('submit', '.wft-download-page-form', function (event) {
+        event.preventDefault();
+
+        submitFormAjax(this, getSubmitter(event, this), {
+            busyText: WFTAdmin.strings.saving
+        });
+    });
+
     $(document).on('submit', '.wft-settings-form', function (event) {
         event.preventDefault();
 

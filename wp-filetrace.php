@@ -3,7 +3,7 @@
  * Plugin Name: WP FileTrace
  * Plugin URI: https://asenka.com/
  * Description: Track WordPress media and external file downloads through shortcodes and shareable tracked links.
- * Version: 0.1.10
+ * Version: 0.1.11
  * Author: Asenka Interactive
  * Author URI: https://asenka.com/
  * Text Domain: wp-filetrace
@@ -17,7 +17,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-define( 'WFT_VERSION', '0.1.10' );
+define( 'WFT_VERSION', '0.1.11' );
 define( 'WFT_FILE', __FILE__ );
 define( 'WFT_PATH', plugin_dir_path( __FILE__ ) );
 define( 'WFT_URL', plugin_dir_url( __FILE__ ) );
@@ -51,6 +51,7 @@ function wft_test_rows_enabled(): bool {
 require_once WFT_PATH . 'includes/class-wft-db.php';
 require_once WFT_PATH . 'includes/class-wft-downloads.php';
 require_once WFT_PATH . 'includes/class-wft-shortcodes.php';
+require_once WFT_PATH . 'includes/class-wft-download-page.php';
 require_once WFT_PATH . 'includes/class-wft-router.php';
 require_once WFT_PATH . 'includes/class-wft-export.php';
 
@@ -76,6 +77,7 @@ final class WP_FileTrace {
         WFT_DB::init();
         WFT_Downloads::init();
         WFT_Shortcodes::init();
+        WFT_Download_Page::init();
         WFT_Router::init();
         WFT_Export::init();
         WFT_Analytics::init();
@@ -90,6 +92,7 @@ final class WP_FileTrace {
         WFT_DB::install();
         WFT_Router::register_rewrite_rule();
         flush_rewrite_rules();
+        update_option( 'wft_rewrite_version', WFT_VERSION, false );
     }
 
     public static function deactivate(): void {

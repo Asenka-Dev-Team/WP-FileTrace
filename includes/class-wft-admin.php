@@ -20,6 +20,7 @@ final class WFT_Admin {
         add_action( 'wp_ajax_wft_delete_all_trackers', array( __CLASS__, 'ajax_delete_all_trackers' ) );
         add_action( 'wp_ajax_wft_generate_test_rows', array( __CLASS__, 'ajax_generate_test_rows' ) );
         add_action( 'wp_ajax_wft_save_analytics', array( __CLASS__, 'ajax_save_analytics' ) );
+        add_action( 'wp_ajax_wft_save_download_page', array( __CLASS__, 'ajax_save_download_page' ) );
         add_action( 'wp_ajax_wft_check_updates', array( __CLASS__, 'ajax_check_updates' ) );
         add_action( 'wp_ajax_wft_save_settings', array( __CLASS__, 'ajax_save_settings' ) );
 
@@ -35,6 +36,7 @@ final class WFT_Admin {
         add_action( 'admin_post_wft_delete_all_trackers', array( __CLASS__, 'delete_all_trackers' ) );
         add_action( 'admin_post_wft_generate_test_rows', array( __CLASS__, 'generate_test_rows' ) );
         add_action( 'admin_post_wft_save_analytics', array( __CLASS__, 'save_analytics' ) );
+        add_action( 'admin_post_wft_save_download_page', array( __CLASS__, 'save_download_page' ) );
         add_action( 'admin_post_wft_check_updates', array( __CLASS__, 'check_updates' ) );
         add_action( 'admin_post_wft_save_settings', array( __CLASS__, 'save_settings' ) );
 
@@ -135,7 +137,7 @@ final class WFT_Admin {
     }
 
     private static function available_tabs(): array {
-        $tabs = array( 'tracked', 'analytics', 'updates', 'settings' );
+        $tabs = array( 'tracked', 'analytics', 'download-page', 'settings' );
         if ( wft_sdm_migration_enabled() ) {
             $tabs[] = 'migration';
         }
@@ -188,6 +190,9 @@ final class WFT_Admin {
         self::ajax_guard();
 
         $tab = isset( $_POST['tab'] ) ? sanitize_key( wp_unslash( $_POST['tab'] ) ) : 'tracked';
+        if ( 'updates' === $tab ) {
+            $tab = 'settings';
+        }
         if ( ! in_array( $tab, self::available_tabs(), true ) ) {
             $tab = 'tracked';
         }
@@ -337,21 +342,51 @@ final class WFT_Admin {
             $notice = 'event_cleared';
         } else {
             $global_snippet = isset( $_POST['wft_ga_global_snippet'] ) ? (string) wp_unslash( $_POST['wft_ga_global_snippet'] ) : '';
-            $event_snippet        = isset( $_POST['wft_ga_event_snippet'] ) ? (string) wp_unslash( $_POST['wft_ga_event_snippet'] ) : '';
+            $event_snippet         = isset( $_POST['wft_ga_event_snippet'] ) ? (string) wp_unslash( $_POST['wft_ga_event_snippet'] ) : '';
             $download_id_parameter = isset( $_POST['wft_ga_download_id_parameter'] ) ? sanitize_text_field( wp_unslash( $_POST['wft_ga_download_id_parameter'] ) ) : '';
             $file_parameter        = isset( $_POST['wft_ga_filename_parameter'] ) ? sanitize_text_field( wp_unslash( $_POST['wft_ga_filename_parameter'] ) ) : '';
+            $source_parameter      = isset( $_POST['wft_ga_source_parameter'] ) ? sanitize_text_field( wp_unslash( $_POST['wft_ga_source_parameter'] ) ) : '';
 
             if ( ( '' !== trim( $global_snippet ) || '' !== trim( $event_snippet ) ) && ! current_user_can( 'unfiltered_html' ) ) {
                 wp_send_json_error( array( 'message' => __( 'Your account is not allowed to save executable analytics snippets.', 'wp-filetrace' ) ), 403 );
             }
 
-            WFT_Analytics::save_settings( $global_snippet, $event_snippet, $download_id_parameter, $file_parameter );
+            WFT_Analytics::save_settings( $global_snippet, $event_snippet, $download_id_parameter, $file_parameter, $source_parameter );
         }
 
         self::ajax_send_page(
             array(
                 'tab'                  => 'analytics',
                 'wft_analytics_notice' => $notice,
+            )
+        );
+    }
+
+    public static function ajax_save_download_page(): void {
+        self::ajax_guard();
+
+        $action = isset( $_POST['wft_download_page_action'] ) ? sanitize_key( wp_unslash( $_POST['wft_download_page_action'] ) ) : 'save';
+        $notice = 'saved';
+
+        if ( 'clear_html' === $action ) {
+            WFT_Download_Page::clear_html();
+            $notice = 'html_cleared';
+        } elseif ( 'clear_css' === $action ) {
+            WFT_Download_Page::clear_css();
+            $notice = 'css_cleared';
+        } elseif ( 'clear_all' === $action ) {
+            WFT_Download_Page::clear_all();
+            $notice = 'all_cleared';
+        } else {
+            $html = isset( $_POST['wft_download_page_html'] ) ? (string) wp_unslash( $_POST['wft_download_page_html'] ) : '';
+            $css  = isset( $_POST['wft_download_page_css'] ) ? (string) wp_unslash( $_POST['wft_download_page_css'] ) : '';
+            WFT_Download_Page::save_settings( $html, $css );
+        }
+
+        self::ajax_send_page(
+            array(
+                'tab'                      => 'download-page',
+                'wft_download_page_notice' => $notice,
             )
         );
     }
@@ -383,7 +418,7 @@ final class WFT_Admin {
 
         self::ajax_send_page(
             array(
-                'tab'                     => 'updates',
+                'tab'                     => 'settings',
                 'wft_update_check_notice' => $notice,
             ),
             array( 'diagnostics' => $status )
@@ -701,15 +736,16 @@ final class WFT_Admin {
             $notice = 'event_cleared';
         } else {
             $global_snippet = isset( $_POST['wft_ga_global_snippet'] ) ? (string) wp_unslash( $_POST['wft_ga_global_snippet'] ) : '';
-            $event_snippet        = isset( $_POST['wft_ga_event_snippet'] ) ? (string) wp_unslash( $_POST['wft_ga_event_snippet'] ) : '';
+            $event_snippet         = isset( $_POST['wft_ga_event_snippet'] ) ? (string) wp_unslash( $_POST['wft_ga_event_snippet'] ) : '';
             $download_id_parameter = isset( $_POST['wft_ga_download_id_parameter'] ) ? sanitize_text_field( wp_unslash( $_POST['wft_ga_download_id_parameter'] ) ) : '';
             $file_parameter        = isset( $_POST['wft_ga_filename_parameter'] ) ? sanitize_text_field( wp_unslash( $_POST['wft_ga_filename_parameter'] ) ) : '';
+            $source_parameter      = isset( $_POST['wft_ga_source_parameter'] ) ? sanitize_text_field( wp_unslash( $_POST['wft_ga_source_parameter'] ) ) : '';
 
             if ( ( '' !== trim( $global_snippet ) || '' !== trim( $event_snippet ) ) && ! current_user_can( 'unfiltered_html' ) ) {
                 wp_die( esc_html__( 'Your account is not allowed to save executable analytics snippets.', 'wp-filetrace' ) );
             }
 
-            WFT_Analytics::save_settings( $global_snippet, $event_snippet, $download_id_parameter, $file_parameter );
+            WFT_Analytics::save_settings( $global_snippet, $event_snippet, $download_id_parameter, $file_parameter, $source_parameter );
         }
 
         wp_safe_redirect(
@@ -718,6 +754,44 @@ final class WFT_Admin {
                     'page'                 => self::PAGE_SLUG,
                     'tab'                  => 'analytics',
                     'wft_analytics_notice' => $notice,
+                ),
+                admin_url( 'admin.php' )
+            )
+        );
+        exit;
+    }
+
+    public static function save_download_page(): void {
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_die( esc_html__( 'Permission denied.', 'wp-filetrace' ) );
+        }
+
+        check_admin_referer( 'wft_save_download_page' );
+
+        $action = isset( $_POST['wft_download_page_action'] ) ? sanitize_key( wp_unslash( $_POST['wft_download_page_action'] ) ) : 'save';
+        $notice = 'saved';
+
+        if ( 'clear_html' === $action ) {
+            WFT_Download_Page::clear_html();
+            $notice = 'html_cleared';
+        } elseif ( 'clear_css' === $action ) {
+            WFT_Download_Page::clear_css();
+            $notice = 'css_cleared';
+        } elseif ( 'clear_all' === $action ) {
+            WFT_Download_Page::clear_all();
+            $notice = 'all_cleared';
+        } else {
+            $html = isset( $_POST['wft_download_page_html'] ) ? (string) wp_unslash( $_POST['wft_download_page_html'] ) : '';
+            $css  = isset( $_POST['wft_download_page_css'] ) ? (string) wp_unslash( $_POST['wft_download_page_css'] ) : '';
+            WFT_Download_Page::save_settings( $html, $css );
+        }
+
+        wp_safe_redirect(
+            add_query_arg(
+                array(
+                    'page'                     => self::PAGE_SLUG,
+                    'tab'                      => 'download-page',
+                    'wft_download_page_notice' => $notice,
                 ),
                 admin_url( 'admin.php' )
             )
@@ -767,7 +841,7 @@ final class WFT_Admin {
             add_query_arg(
                 array(
                     'page'                    => self::PAGE_SLUG,
-                    'tab'                     => 'updates',
+                    'tab'                     => 'settings',
                     'wft_update_check_notice' => $notice,
                 ),
                 admin_url( 'admin.php' )
@@ -871,10 +945,10 @@ final class WFT_Admin {
 
     private static function render_tabs( string $active_tab ): void {
         $tabs = array(
-            'tracked'   => __( 'Tracked Files', 'wp-filetrace' ),
-            'analytics' => __( 'Analytics', 'wp-filetrace' ),
-            'updates'   => __( 'Updates', 'wp-filetrace' ),
-            'settings'  => __( 'Settings', 'wp-filetrace' ),
+            'tracked'       => __( 'Tracked Files', 'wp-filetrace' ),
+            'analytics'     => __( 'Analytics', 'wp-filetrace' ),
+            'download-page' => __( 'Download Page', 'wp-filetrace' ),
+            'settings'      => __( 'Settings', 'wp-filetrace' ),
         );
 
         if ( wft_sdm_migration_enabled() ) {
@@ -898,7 +972,8 @@ final class WFT_Admin {
         $event_snippet         = WFT_Analytics::get_event_snippet();
         $download_id_parameter = WFT_Analytics::get_download_id_parameter();
         $file_parameter        = WFT_Analytics::get_filename_parameter();
-        $notice         = isset( $_GET['wft_analytics_notice'] ) ? sanitize_key( wp_unslash( $_GET['wft_analytics_notice'] ) ) : '';
+        $source_parameter      = WFT_Analytics::get_source_parameter();
+        $notice                = isset( $_GET['wft_analytics_notice'] ) ? sanitize_key( wp_unslash( $_GET['wft_analytics_notice'] ) ) : '';
         ?>
         <div class="wrap wft-wrap">
             <header class="wft-page-header">
@@ -973,7 +1048,7 @@ final class WFT_Admin {
                             </span>
                         </div>
                         <label class="screen-reader-text" for="wft-ga-event-snippet"><?php esc_html_e( 'Download Event code', 'wp-filetrace' ); ?></label>
-                        <textarea id="wft-ga-event-snippet" class="wft-code-textarea" name="wft_ga_event_snippet" rows="10" spellcheck="false" placeholder="gtag('event', 'haver_download', {&#10;    'download_id': '&lt;&lt;INSERT ID HERE&gt;&gt;',&#10;    'download_name': '&lt;&lt;INSERT NAME HERE&gt;&gt;'&#10;});"><?php echo esc_textarea( $event_snippet ); ?></textarea>
+                        <textarea id="wft-ga-event-snippet" class="wft-code-textarea" name="wft_ga_event_snippet" rows="10" spellcheck="false" placeholder="gtag('event', 'haver_download', {&#10;    'download_id': '&lt;&lt;INSERT ID HERE&gt;&gt;',&#10;    'download_name': '&lt;&lt;INSERT NAME HERE&gt;&gt;',&#10;    'download_source': '&lt;&lt;INSERT SOURCE HERE&gt;&gt;'&#10;});"><?php echo esc_textarea( $event_snippet ); ?></textarea>
                         <p class="description"><?php esc_html_e( 'A surrounding <script> tag is optional for this field. WP FileTrace executes the event during a short browser handoff and then continues to the requested file.', 'wp-filetrace' ); ?></p>
                     </div>
 
@@ -993,9 +1068,17 @@ final class WFT_Admin {
                         </p>
                     </div>
 
+                    <div class="wft-analytics-section wft-analytics-parameter-section">
+                        <label for="wft-ga-source-parameter"><?php esc_html_e( 'Download Source Event Parameter', 'wp-filetrace' ); ?></label>
+                        <input type="text" id="wft-ga-source-parameter" name="wft_ga_source_parameter" value="<?php echo esc_attr( $source_parameter ); ?>" placeholder="download_source">
+                        <p class="description">
+                            <?php esc_html_e( 'Optional. Enter the gtag event parameter that should receive what triggered the tracked download. WP FileTrace sends shortcode for [wft] button downloads and external for shareable/direct tracked links. Example: download_source.', 'wp-filetrace' ); ?>
+                        </p>
+                    </div>
+
                     <div class="wft-analytics-note">
                         <strong><?php esc_html_e( 'How downloads are handled:', 'wp-filetrace' ); ?></strong>
-                        <?php esc_html_e( 'When Download Event code is configured, a valid tracked request is recorded first, the event runs in the visitor’s browser, and WP FileTrace then redirects to the file. If no event code is configured, downloads retain the normal direct redirect behavior.', 'wp-filetrace' ); ?>
+                        <?php esc_html_e( 'A valid tracked request is recorded first, then WP FileTrace shows the download handoff page. If Download Event code is configured, the event runs there before the no-track retry route starts the file download. Without event code, the same handoff page is used without sending analytics.', 'wp-filetrace' ); ?>
                     </div>
 
                     <div class="wft-analytics-actions">
@@ -1017,7 +1100,114 @@ final class WFT_Admin {
         <?php
     }
 
-    private static function render_updates_page(): void {
+    private static function render_download_page(): void {
+        $html   = WFT_Download_Page::get_html();
+        $css    = WFT_Download_Page::get_css();
+        $notice = isset( $_GET['wft_download_page_notice'] ) ? sanitize_key( wp_unslash( $_GET['wft_download_page_notice'] ) ) : '';
+        ?>
+        <div class="wrap wft-wrap">
+            <header class="wft-page-header">
+                <div class="wft-brand">
+                    <div class="wft-logo-shell">
+                        <img src="<?php echo esc_url( WFT_URL . 'assets/images/logo--wp-filetrace.svg' ); ?>" alt="<?php esc_attr_e( 'WP FileTrace', 'wp-filetrace' ); ?>">
+                    </div>
+                    <div class="wft-info-shell">
+                        <h1><?php esc_html_e( 'WP FileTrace', 'wp-filetrace' ); ?></h1>
+                        <p class="quip"><?php esc_html_e( 'Create tracked download links, monitor usage, and export download data.', 'wp-filetrace' ); ?></p>
+                    </div>
+                </div>
+                <a class="wft-asenka-link" href="https://asenka.com/" target="_blank" rel="noopener noreferrer">Asenka.com ↗</a>
+            </header>
+
+            <?php self::render_tabs( 'download-page' ); ?>
+
+            <?php if ( $notice ) : ?>
+                <div class="notice notice-success is-dismissible"><p>
+                    <?php
+                    if ( 'html_cleared' === $notice ) {
+                        esc_html_e( 'Custom download-page HTML cleared. The built-in layout will be used unless new HTML is saved.', 'wp-filetrace' );
+                    } elseif ( 'css_cleared' === $notice ) {
+                        esc_html_e( 'Custom download-page CSS cleared.', 'wp-filetrace' );
+                    } elseif ( 'all_cleared' === $notice ) {
+                        esc_html_e( 'Download-page customizations cleared. The built-in WP FileTrace download page is active.', 'wp-filetrace' );
+                    } else {
+                        esc_html_e( 'Download-page settings saved.', 'wp-filetrace' );
+                    }
+                    ?>
+                </p></div>
+            <?php endif; ?>
+
+            <section class="wft-card wft-download-page-card">
+                <div class="wft-card-heading">
+                    <div>
+                        <span class="wft-eyebrow"><?php esc_html_e( 'Frontend Handoff', 'wp-filetrace' ); ?></span>
+                        <h2><?php esc_html_e( 'Download Page', 'wp-filetrace' ); ?></h2>
+                    </div>
+                    <a class="button wft-preview-button" href="<?php echo esc_url( WFT_Download_Page::preview_url() ); ?>" target="_blank" rel="noopener noreferrer">
+                        <span class="dashicons dashicons-visibility" aria-hidden="true"></span>
+                        <?php esc_html_e( 'Preview Saved Page', 'wp-filetrace' ); ?>
+                    </a>
+                </div>
+
+                <p class="wft-download-page-intro">
+                    <?php esc_html_e( 'Every successfully tracked download now passes through a lightweight handoff page. Leave these fields blank to use the improved built-in WP FileTrace layout, or provide your own HTML and CSS to white-label the experience.', 'wp-filetrace' ); ?>
+                </p>
+
+                <div class="wft-download-page-note">
+                    <strong><?php esc_html_e( 'Retry links do not count twice.', 'wp-filetrace' ); ?></strong>
+                    <?php esc_html_e( 'The automatic download and the delayed “download manually” link use a no-track retry route. Clicking the retry link does not increment WP FileTrace counters or fire the configured gtag event again.', 'wp-filetrace' ); ?>
+                </div>
+
+                <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="wft-download-page-form">
+                    <input type="hidden" name="action" value="wft_save_download_page">
+                    <?php wp_nonce_field( 'wft_save_download_page' ); ?>
+
+                    <div class="wft-download-page-editor-grid">
+                        <div class="wft-download-page-editor">
+                            <label for="wft-download-page-html"><?php esc_html_e( 'Custom HTML', 'wp-filetrace' ); ?></label>
+                            <p class="description"><?php esc_html_e( 'Optional. This markup replaces the built-in content card but remains inside WP FileTrace’s centered page wrapper. Script tags are not supported here; use the Analytics tab for gtag JavaScript.', 'wp-filetrace' ); ?></p>
+                            <textarea id="wft-download-page-html" class="wft-code-textarea" name="wft_download_page_html" rows="18" spellcheck="false" placeholder="<div class=&quot;download-message&quot;>&#10;    <h1>Preparing your {{download_name}} download</h1>&#10;    <p>Your file should begin downloading automatically.</p>&#10;</div>"><?php echo esc_textarea( $html ); ?></textarea>
+                        </div>
+
+                        <div class="wft-download-page-editor">
+                            <label for="wft-download-page-css"><?php esc_html_e( 'Custom CSS', 'wp-filetrace' ); ?></label>
+                            <p class="description"><?php esc_html_e( 'Optional. Loaded after the built-in download-page styles so your rules can override the default presentation. Scope custom rules under .wft-download-page when possible.', 'wp-filetrace' ); ?></p>
+                            <textarea id="wft-download-page-css" class="wft-code-textarea" name="wft_download_page_css" rows="18" spellcheck="false" placeholder=".wft-download-page {&#10;    background: #f5f5f5;&#10;}&#10;&#10;.download-message h1 {&#10;    font-size: 2rem;&#10;}"><?php echo esc_textarea( $css ); ?></textarea>
+                        </div>
+                    </div>
+
+                    <div class="wft-template-variables">
+                        <span class="wft-eyebrow"><?php esc_html_e( 'Available HTML Variables', 'wp-filetrace' ); ?></span>
+                        <div class="wft-template-variable-grid">
+                            <code>{{download_name}}</code><span><?php esc_html_e( 'Human-readable WP FileTrace tracker title.', 'wp-filetrace' ); ?></span>
+                            <code>{{file_name}}</code><span><?php esc_html_e( 'Actual filename resolved from the destination URL.', 'wp-filetrace' ); ?></span>
+                            <code>{{download_url}}</code><span><?php esc_html_e( 'No-track retry URL. Safe to use for a custom manual-download link.', 'wp-filetrace' ); ?></span>
+                            <code>{{download_source}}</code><span><?php esc_html_e( 'shortcode or external.', 'wp-filetrace' ); ?></span>
+                            <code>{{site_name}}</code><span><?php esc_html_e( 'Current WordPress site name.', 'wp-filetrace' ); ?></span>
+                        </div>
+                    </div>
+
+                    <div class="wft-download-page-actions">
+                        <button type="submit" name="wft_download_page_action" value="save" class="button button-primary"><?php esc_html_e( 'Save Download Page', 'wp-filetrace' ); ?></button>
+                        <button type="submit" name="wft_download_page_action" value="clear_html" class="button"><?php esc_html_e( 'Clear HTML', 'wp-filetrace' ); ?></button>
+                        <button type="submit" name="wft_download_page_action" value="clear_css" class="button"><?php esc_html_e( 'Clear CSS', 'wp-filetrace' ); ?></button>
+                        <button type="submit" name="wft_download_page_action" value="clear_all" class="button"><?php esc_html_e( 'Reset to Default', 'wp-filetrace' ); ?></button>
+                    </div>
+                </form>
+            </section>
+
+            <footer class="wft-footer">
+                <span><?php echo esc_html( sprintf( __( 'WP FileTrace v%s', 'wp-filetrace' ), WFT_VERSION ) ); ?></span>
+                <span>•</span>
+                <span><?php esc_html_e( 'Primary Developer: Brian McLendon', 'wp-filetrace' ); ?></span>
+                <span>•</span>
+                <a href="https://asenka.com/" target="_blank" rel="noopener noreferrer">Asenka.com</a>
+            </footer>
+        </div>
+        <?php
+    }
+
+    private static function render_update_settings_section(): void {
         $status = WFT_Updater::get_diagnostics();
         $notice = isset( $_GET['wft_update_check_notice'] ) ? sanitize_key( wp_unslash( $_GET['wft_update_check_notice'] ) ) : '';
 
@@ -1036,102 +1226,77 @@ final class WFT_Admin {
 
         $latest_version = ! empty( $status['latest_version'] ) ? 'v' . ltrim( (string) $status['latest_version'], 'vV' ) : '—';
         ?>
-        <div class="wrap wft-wrap">
-            <header class="wft-page-header">
-                <div class="wft-brand">
-                    <div class="wft-logo-shell">
-                        <img src="<?php echo esc_url( WFT_URL . 'assets/images/logo--wp-filetrace.svg' ); ?>" alt="<?php esc_attr_e( 'WP FileTrace', 'wp-filetrace' ); ?>">
-                    </div>
-                    <div class="wft-info-shell">
-                        <h1><?php esc_html_e( 'WP FileTrace', 'wp-filetrace' ); ?></h1>
-                        <p class="quip"><?php esc_html_e( 'Create tracked download links, monitor usage, and export download data.', 'wp-filetrace' ); ?></p>
-                    </div>
+        <?php if ( $notice ) : ?>
+            <div class="notice <?php echo 'error' === $notice ? 'notice-error' : 'notice-success'; ?> is-dismissible">
+                <p>
+                    <?php
+                    if ( 'available' === $notice ) {
+                        esc_html_e( 'Update check completed. A newer WP FileTrace release is available through WordPress Updates.', 'wp-filetrace' );
+                    } elseif ( 'current' === $notice ) {
+                        esc_html_e( 'Update check completed. No newer WP FileTrace release is available.', 'wp-filetrace' );
+                    } else {
+                        esc_html_e( 'WP FileTrace could not complete the GitHub update check. See the connection status below.', 'wp-filetrace' );
+                    }
+                    ?>
+                </p>
+            </div>
+        <?php endif; ?>
+
+        <section class="wft-card wft-updates-card">
+            <div class="wft-card-heading">
+                <div>
+                    <span class="wft-eyebrow"><?php esc_html_e( 'Updates', 'wp-filetrace' ); ?></span>
+                    <h2><?php esc_html_e( 'GitHub Release Status', 'wp-filetrace' ); ?></h2>
                 </div>
-                <a class="wft-asenka-link" href="https://asenka.com/" target="_blank" rel="noopener noreferrer">Asenka.com ↗</a>
-            </header>
+            </div>
 
-            <?php self::render_tabs( 'updates' ); ?>
+            <div class="wft-update-status-grid">
+                <div class="wft-update-status-item">
+                    <span><?php esc_html_e( 'Installed Version', 'wp-filetrace' ); ?></span>
+                    <strong><?php echo esc_html( 'v' . WFT_VERSION ); ?></strong>
+                </div>
+                <div class="wft-update-status-item">
+                    <span><?php esc_html_e( 'Latest Release', 'wp-filetrace' ); ?></span>
+                    <strong><?php echo esc_html( $latest_version ); ?></strong>
+                </div>
+                <div class="wft-update-status-item">
+                    <span><?php esc_html_e( 'Last Checked', 'wp-filetrace' ); ?></span>
+                    <strong><?php echo esc_html( $last_checked ); ?></strong>
+                </div>
+                <div class="wft-update-status-item">
+                    <span><?php esc_html_e( 'Connection Status', 'wp-filetrace' ); ?></span>
+                    <strong class="wft-update-connection is-<?php echo esc_attr( $connection ); ?>"><?php echo esc_html( $connection_label ); ?></strong>
+                </div>
+            </div>
 
-            <?php if ( $notice ) : ?>
-                <div class="notice <?php echo 'error' === $notice ? 'notice-error' : 'notice-success'; ?> is-dismissible">
-                    <p>
-                        <?php
-                        if ( 'available' === $notice ) {
-                            esc_html_e( 'Update check completed. A newer WP FileTrace release is available through WordPress Updates.', 'wp-filetrace' );
-                        } elseif ( 'current' === $notice ) {
-                            esc_html_e( 'Update check completed. No newer WP FileTrace release is available.', 'wp-filetrace' );
-                        } else {
-                            esc_html_e( 'WP FileTrace could not complete the GitHub update check. See the connection status below.', 'wp-filetrace' );
-                        }
-                        ?>
-                    </p>
+            <?php if ( ! empty( $status['message'] ) ) : ?>
+                <p class="wft-update-message"><?php echo esc_html( (string) $status['message'] ); ?></p>
+            <?php endif; ?>
+
+            <?php if ( ! empty( $status['update_available'] ) ) : ?>
+                <div class="wft-update-available-note">
+                    <strong><?php esc_html_e( 'Update available.', 'wp-filetrace' ); ?></strong>
+                    <?php esc_html_e( 'WordPress has been refreshed with the latest WP FileTrace release information.', 'wp-filetrace' ); ?>
+                    <a href="<?php echo esc_url( admin_url( 'update-core.php' ) ); ?>"><?php esc_html_e( 'Open WordPress Updates', 'wp-filetrace' ); ?></a>
                 </div>
             <?php endif; ?>
 
-            <section class="wft-card wft-updates-card">
-                <div class="wft-card-heading">
-                    <div>
-                        <span class="wft-eyebrow"><?php esc_html_e( 'GitHub Releases', 'wp-filetrace' ); ?></span>
-                        <h2><?php esc_html_e( 'Update Status', 'wp-filetrace' ); ?></h2>
-                    </div>
-                </div>
+            <div class="wft-update-actions">
+                <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="wft-update-check-form">
+                    <input type="hidden" name="action" value="wft_check_updates">
+                    <?php wp_nonce_field( 'wft_check_updates' ); ?>
+                    <button type="submit" class="button button-primary">
+                        <span class="dashicons dashicons-update" aria-hidden="true"></span>
+                        <?php esc_html_e( 'Check for Updates', 'wp-filetrace' ); ?>
+                    </button>
+                </form>
+                <a class="button" href="<?php echo esc_url( WFT_Updater::releases_url() ); ?>" target="_blank" rel="noopener noreferrer"><?php esc_html_e( 'View GitHub Releases', 'wp-filetrace' ); ?> ↗</a>
+            </div>
 
-                <div class="wft-update-status-grid">
-                    <div class="wft-update-status-item">
-                        <span><?php esc_html_e( 'Installed Version', 'wp-filetrace' ); ?></span>
-                        <strong><?php echo esc_html( 'v' . WFT_VERSION ); ?></strong>
-                    </div>
-                    <div class="wft-update-status-item">
-                        <span><?php esc_html_e( 'Latest Release', 'wp-filetrace' ); ?></span>
-                        <strong><?php echo esc_html( $latest_version ); ?></strong>
-                    </div>
-                    <div class="wft-update-status-item">
-                        <span><?php esc_html_e( 'Last Checked', 'wp-filetrace' ); ?></span>
-                        <strong><?php echo esc_html( $last_checked ); ?></strong>
-                    </div>
-                    <div class="wft-update-status-item">
-                        <span><?php esc_html_e( 'Connection Status', 'wp-filetrace' ); ?></span>
-                        <strong class="wft-update-connection is-<?php echo esc_attr( $connection ); ?>"><?php echo esc_html( $connection_label ); ?></strong>
-                    </div>
-                </div>
-
-                <?php if ( ! empty( $status['message'] ) ) : ?>
-                    <p class="wft-update-message"><?php echo esc_html( (string) $status['message'] ); ?></p>
-                <?php endif; ?>
-
-                <?php if ( ! empty( $status['update_available'] ) ) : ?>
-                    <div class="wft-update-available-note">
-                        <strong><?php esc_html_e( 'Update available.', 'wp-filetrace' ); ?></strong>
-                        <?php esc_html_e( 'WordPress has been refreshed with the latest WP FileTrace release information.', 'wp-filetrace' ); ?>
-                        <a href="<?php echo esc_url( admin_url( 'update-core.php' ) ); ?>"><?php esc_html_e( 'Open WordPress Updates', 'wp-filetrace' ); ?></a>
-                    </div>
-                <?php endif; ?>
-
-                <div class="wft-update-actions">
-                    <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="wft-update-check-form">
-                        <input type="hidden" name="action" value="wft_check_updates">
-                        <?php wp_nonce_field( 'wft_check_updates' ); ?>
-                        <button type="submit" class="button button-primary">
-                            <span class="dashicons dashicons-update" aria-hidden="true"></span>
-                            <?php esc_html_e( 'Check for Updates', 'wp-filetrace' ); ?>
-                        </button>
-                    </form>
-                    <a class="button" href="<?php echo esc_url( WFT_Updater::releases_url() ); ?>" target="_blank" rel="noopener noreferrer"><?php esc_html_e( 'View GitHub Releases', 'wp-filetrace' ); ?> ↗</a>
-                </div>
-
-                <p class="description wft-update-cache-note">
-                    <?php esc_html_e( 'Automatic GitHub release metadata is cached for up to one hour. Check for Updates bypasses that cache and immediately rebuilds WordPress plugin-update data.', 'wp-filetrace' ); ?>
-                </p>
-            </section>
-
-            <footer class="wft-footer">
-                <span><?php echo esc_html( sprintf( __( 'WP FileTrace v%s', 'wp-filetrace' ), WFT_VERSION ) ); ?></span>
-                <span>•</span>
-                <span><?php esc_html_e( 'Primary Developer: Brian McLendon', 'wp-filetrace' ); ?></span>
-                <span>•</span>
-                <a href="https://asenka.com/" target="_blank" rel="noopener noreferrer">Asenka.com</a>
-            </footer>
-        </div>
+            <p class="description wft-update-cache-note">
+                <?php esc_html_e( 'Automatic GitHub release metadata is cached for up to one hour. Check for Updates bypasses that cache and immediately rebuilds WordPress plugin-update data.', 'wp-filetrace' ); ?>
+            </p>
+        </section>
         <?php
     }
 
@@ -1227,6 +1392,8 @@ final class WFT_Admin {
             <?php if ( 'saved' === $notice ) : ?>
                 <div class="notice notice-success is-dismissible"><p><?php esc_html_e( 'WP FileTrace settings saved.', 'wp-filetrace' ); ?></p></div>
             <?php endif; ?>
+
+            <?php self::render_update_settings_section(); ?>
 
             <section class="wft-card wft-settings-card">
                 <div class="wft-card-heading">
@@ -1695,8 +1862,13 @@ final class WFT_Admin {
             self::render_analytics_page();
             return;
         }
+        if ( 'download-page' === $tab ) {
+            self::render_download_page();
+            return;
+        }
         if ( 'updates' === $tab ) {
-            self::render_updates_page();
+            // Backwards-compatible destination for old bookmarked Updates-tab URLs.
+            self::render_settings_page();
             return;
         }
         if ( 'settings' === $tab ) {
