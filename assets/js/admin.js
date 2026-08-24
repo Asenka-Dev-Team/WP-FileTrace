@@ -162,7 +162,8 @@
             tab: url.searchParams.get('tab') || 'tracked',
             orderby: url.searchParams.get('orderby') || 'created_at',
             order: url.searchParams.get('order') || 'desc',
-            paged: url.searchParams.get('paged') || '1'
+            paged: url.searchParams.get('paged') || '1',
+            wft_sdm_scan: url.searchParams.get('wft_sdm_scan') || ''
         };
 
         postAdmin(data, {
@@ -475,11 +476,54 @@
         });
     });
 
+    $(document).on('submit', '.wft-settings-form', function (event) {
+        event.preventDefault();
+
+        submitFormAjax(this, getSubmitter(event, this), {
+            busyText: WFTAdmin.strings.saving
+        });
+    });
+
     $(document).on('submit', '.wft-update-check-form', function (event) {
         event.preventDefault();
 
         submitFormAjax(this, getSubmitter(event, this), {
             busyText: WFTAdmin.strings.checking
+        });
+    });
+
+    $(document).on('submit', '.wft-sdm-scan-form', function (event) {
+        event.preventDefault();
+
+        submitFormAjax(this, getSubmitter(event, this), {
+            busyText: WFTAdmin.strings.scanningMigration
+        });
+    });
+
+    $(document).on('submit', '.wft-sdm-apply-form', function (event) {
+        event.preventDefault();
+        if (!window.confirm(WFTAdmin.strings.confirmMigrationApply)) return;
+
+        submitFormAjax(this, getSubmitter(event, this), {
+            busyText: WFTAdmin.strings.applyingMigration
+        });
+    });
+
+    $(document).on('submit', '.wft-sdm-rollback-form', function (event) {
+        event.preventDefault();
+        if (!window.confirm(WFTAdmin.strings.confirmMigrationRollback)) return;
+
+        submitFormAjax(this, getSubmitter(event, this), {
+            busyText: WFTAdmin.strings.rollingBackMigration
+        });
+    });
+
+    $(document).on('submit', '.wft-sdm-discard-form', function (event) {
+        event.preventDefault();
+        if (!window.confirm(WFTAdmin.strings.confirmMigrationDiscard)) return;
+
+        submitFormAjax(this, getSubmitter(event, this), {
+            busyText: WFTAdmin.strings.discardingMigration
         });
     });
 

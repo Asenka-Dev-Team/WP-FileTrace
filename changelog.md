@@ -12,6 +12,36 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ### Fixed
 
+## [0.1.8] - 2026-08-24
+
+### Added
+- Added a Settings-controlled developer toggle for the 200-row test-data generator; the test action is disabled server-side when the toggle is off.
+
+- Added an optional **Simple Download Monitor Migration (Beta)** feature for moving individual SDM download shortcodes into WP FileTrace.
+- Added a new **Settings** tab with a clearly labeled **Beta Features** section and checkbox to enable/disable the SDM migration utility.
+- Added conditional Migration-tab visibility and conditional SDM migration handler/class loading based on the saved beta-feature setting.
+- Added a non-destructive **Scan Site / Dry Run** that lists each discovered `[sdm_download]` / `[sdm-download]` usage, source content item, SDM download item, resolved file, proposed `[wft]` shortcode, tracker create/reuse state, and migration status.
+- Added Media Library URL resolution so SDM files already present in WordPress media can migrate to `[wft media="..."]`; other valid URLs migrate to `[wft url="..."]`.
+- Added preservation of SDM shortcode/item download button text when generating WP FileTrace replacements.
+- Added conservative migration review checks for missing SDM items/files, password-protected or unpublished downloads, unsupported behavior-changing shortcode attributes, and globally enabled SDM Terms & Conditions/reCAPTCHA.
+- Added report-only detection for SDM shortcodes stored in post meta/page-builder data instead of attempting unsafe serialized/meta replacements.
+- Added **Apply Safe Replacements** to create/reuse WP FileTrace tracker records and update only rows marked Ready.
+- Added per-content rollback backups before migration changes, plus **Roll Back Content Changes** and **Discard Rollback Backup** controls.
+- Added AJAX behavior for migration scan, apply, rollback, and backup-discard actions with non-JavaScript admin-post fallbacks.
+- Added `WFT_Downloads::get_by_destination()` to safely detect and reuse an existing tracker for migration/helper workflows.
+
+### Changed
+
+- Bumped WP FileTrace to v0.1.8.
+- Expanded the admin interface with a Settings tab; the Migration tab now appears only while the SDM migration beta is enabled.
+- Marked the Migration interface itself as **Beta** and documented that it currently supports Simple Download Monitor only.
+- Updated uninstall cleanup to remove migration options, the beta enable/disable setting, and rollback post metadata.
+- Updated README documentation for the SDM migration workflow and its safety boundaries.
+
+### Fixed
+
+- Avoided blind database-wide shortcode replacement by limiting automatic edits to validated `post_content` occurrences and explicitly surfacing unsafe/unsupported usages for review.
+
 ## [0.1.7] - 2026-08-21
 
 ### Added

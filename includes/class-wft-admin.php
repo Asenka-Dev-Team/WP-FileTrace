@@ -21,6 +21,14 @@ final class WFT_Admin {
         add_action( 'wp_ajax_wft_generate_test_rows', array( __CLASS__, 'ajax_generate_test_rows' ) );
         add_action( 'wp_ajax_wft_save_analytics', array( __CLASS__, 'ajax_save_analytics' ) );
         add_action( 'wp_ajax_wft_check_updates', array( __CLASS__, 'ajax_check_updates' ) );
+        add_action( 'wp_ajax_wft_save_settings', array( __CLASS__, 'ajax_save_settings' ) );
+
+        if ( wft_sdm_migration_enabled() ) {
+            add_action( 'wp_ajax_wft_sdm_scan', array( __CLASS__, 'ajax_sdm_scan' ) );
+            add_action( 'wp_ajax_wft_sdm_apply', array( __CLASS__, 'ajax_sdm_apply' ) );
+            add_action( 'wp_ajax_wft_sdm_rollback', array( __CLASS__, 'ajax_sdm_rollback' ) );
+            add_action( 'wp_ajax_wft_sdm_discard_rollback', array( __CLASS__, 'ajax_sdm_discard_rollback' ) );
+        }
         add_action( 'admin_post_wft_update_tracker', array( __CLASS__, 'update_tracker' ) );
         add_action( 'admin_post_wft_delete_tracker', array( __CLASS__, 'delete_tracker' ) );
         add_action( 'admin_post_wft_delete_selected_trackers', array( __CLASS__, 'delete_selected_trackers' ) );
@@ -28,6 +36,14 @@ final class WFT_Admin {
         add_action( 'admin_post_wft_generate_test_rows', array( __CLASS__, 'generate_test_rows' ) );
         add_action( 'admin_post_wft_save_analytics', array( __CLASS__, 'save_analytics' ) );
         add_action( 'admin_post_wft_check_updates', array( __CLASS__, 'check_updates' ) );
+        add_action( 'admin_post_wft_save_settings', array( __CLASS__, 'save_settings' ) );
+
+        if ( wft_sdm_migration_enabled() ) {
+            add_action( 'admin_post_wft_sdm_scan', array( __CLASS__, 'sdm_scan' ) );
+            add_action( 'admin_post_wft_sdm_apply', array( __CLASS__, 'sdm_apply' ) );
+            add_action( 'admin_post_wft_sdm_rollback', array( __CLASS__, 'sdm_rollback' ) );
+            add_action( 'admin_post_wft_sdm_discard_rollback', array( __CLASS__, 'sdm_discard_rollback' ) );
+        }
         add_filter( 'plugin_action_links_' . plugin_basename( WFT_FILE ), array( __CLASS__, 'plugin_action_links' ) );
         add_filter( 'plugin_row_meta', array( __CLASS__, 'plugin_row_meta' ), 10, 2 );
     }
@@ -91,6 +107,13 @@ final class WFT_Admin {
                     'confirmDeleteSelected' => __( 'Are you sure? This will permanently delete the selected tracked files and all of their download history. This cannot be undone.', 'wp-filetrace' ),
                     'confirmDeleteAll'      => __( 'Are you sure? This will permanently delete ALL tracked files on every page and all download history. This cannot be undone.', 'wp-filetrace' ),
                     'confirmTest'           => __( 'Create 200 synthetic tracked-file rows for sorting and pagination testing?', 'wp-filetrace' ),
+                    'scanningMigration'     => __( 'Scanning…', 'wp-filetrace' ),
+                    'applyingMigration'     => __( 'Migrating…', 'wp-filetrace' ),
+                    'rollingBackMigration'  => __( 'Rolling back…', 'wp-filetrace' ),
+                    'discardingMigration'   => __( 'Discarding backup…', 'wp-filetrace' ),
+                    'confirmMigrationApply' => __( 'Apply all migration rows marked Ready? WP FileTrace will create/reuse trackers, back up affected post content, and replace those SDM shortcodes.', 'wp-filetrace' ),
+                    'confirmMigrationRollback' => __( 'Restore the backed-up post content from before the WP FileTrace migration? WP FileTrace tracker records will be left in place.', 'wp-filetrace' ),
+                    'confirmMigrationDiscard' => __( 'Discard the migration rollback backup? This does not change current post content and cannot be undone.', 'wp-filetrace' ),
                 ),
             )
         );
@@ -99,7 +122,7 @@ final class WFT_Admin {
     public static function plugin_action_links( array $links ): array {
         array_unshift(
             $links,
-            '<a href="' . esc_url( admin_url( 'admin.php?page=' . self::PAGE_SLUG ) ) . '">' . esc_html__( 'Settings', 'wp-filetrace' ) . '</a>'
+            '<a href="' . esc_url( admin_url( 'admin.php?page=' . self::PAGE_SLUG . '&tab=settings' ) ) . '">' . esc_html__( 'Settings', 'wp-filetrace' ) . '</a>'
         );
         return $links;
     }
@@ -109,6 +132,26 @@ final class WFT_Admin {
             $links[] = '<a href="https://asenka.com/" target="_blank" rel="noopener noreferrer">Asenka.com</a>';
         }
         return $links;
+    }
+
+    private static function available_tabs(): array {
+        $tabs = array( 'tracked', 'analytics', 'updates', 'settings' );
+        if ( wft_sdm_migration_enabled() ) {
+            $tabs[] = 'migration';
+        }
+        return $tabs;
+    }
+
+    private static function migration_enabled_or_error( bool $ajax = false ): void {
+        if ( wft_sdm_migration_enabled() && class_exists( 'WFT_SDM_Migration' ) ) {
+            return;
+        }
+
+        $message = __( 'The Simple Download Monitor migration beta is disabled. Enable it from WP FileTrace → Settings first.', 'wp-filetrace' );
+        if ( $ajax ) {
+            wp_send_json_error( array( 'message' => $message ), 403 );
+        }
+        wp_die( esc_html( $message ) );
     }
 
     public static function ajax_create_tracker(): void {
@@ -145,7 +188,7 @@ final class WFT_Admin {
         self::ajax_guard();
 
         $tab = isset( $_POST['tab'] ) ? sanitize_key( wp_unslash( $_POST['tab'] ) ) : 'tracked';
-        if ( ! in_array( $tab, array( 'tracked', 'analytics', 'updates' ), true ) ) {
+        if ( ! in_array( $tab, self::available_tabs(), true ) ) {
             $tab = 'tracked';
         }
 
@@ -154,6 +197,8 @@ final class WFT_Admin {
         if ( 'tracked' === $tab ) {
             $state = self::list_state_from_request();
             $query = array_merge( $query, $state );
+        } elseif ( 'migration' === $tab && ! empty( $_POST['wft_sdm_scan'] ) ) {
+            $query['wft_sdm_scan'] = '1';
         }
 
         self::ajax_send_page( $query );
@@ -256,6 +301,15 @@ final class WFT_Admin {
     public static function ajax_generate_test_rows(): void {
         self::ajax_guard();
 
+        if ( ! wft_test_rows_enabled() ) {
+            wp_send_json_error(
+                array(
+                    'message' => __( 'The test row generator is disabled.', 'wp-filetrace' ),
+                ),
+                403
+            );
+        }
+
         $created = WFT_Downloads::create_test_rows( 200 );
 
         self::ajax_send_page(
@@ -301,6 +355,23 @@ final class WFT_Admin {
         );
     }
 
+    public static function ajax_save_settings(): void {
+        self::ajax_guard();
+
+        $migration_enabled = ! empty( $_POST['wft_enable_sdm_migration'] );
+        $test_rows_enabled = ! empty( $_POST['wft_enable_test_rows'] );
+
+        update_option( 'wft_enable_sdm_migration', $migration_enabled ? '1' : '0', false );
+        update_option( 'wft_enable_test_rows', $test_rows_enabled ? '1' : '0', false );
+
+        self::ajax_send_page(
+            array(
+                'tab'                 => 'settings',
+                'wft_settings_notice' => 'saved',
+            )
+        );
+    }
+
     public static function ajax_check_updates(): void {
         self::ajax_guard();
 
@@ -315,6 +386,66 @@ final class WFT_Admin {
                 'wft_update_check_notice' => $notice,
             ),
             array( 'diagnostics' => $status )
+        );
+    }
+
+    public static function ajax_sdm_scan(): void {
+        self::ajax_guard();
+        self::migration_enabled_or_error( true );
+
+        self::ajax_send_page(
+            array(
+                'tab'          => 'migration',
+                'wft_sdm_scan' => '1',
+            )
+        );
+    }
+
+    public static function ajax_sdm_apply(): void {
+        self::ajax_guard();
+        self::migration_enabled_or_error( true );
+
+        $stats = WFT_SDM_Migration::apply_safe_replacements();
+
+        self::ajax_send_page(
+            array(
+                'tab'             => 'migration',
+                'wft_sdm_scan'    => '1',
+                'wft_sdm_applied' => '1',
+            ),
+            array( 'migration' => $stats )
+        );
+    }
+
+    public static function ajax_sdm_rollback(): void {
+        self::ajax_guard();
+        self::migration_enabled_or_error( true );
+
+        $stats = WFT_SDM_Migration::rollback();
+
+        self::ajax_send_page(
+            array(
+                'tab'                => 'migration',
+                'wft_sdm_scan'       => '1',
+                'wft_sdm_rolledback' => '1',
+            ),
+            array( 'migration' => $stats )
+        );
+    }
+
+    public static function ajax_sdm_discard_rollback(): void {
+        self::ajax_guard();
+        self::migration_enabled_or_error( true );
+
+        $removed = WFT_SDM_Migration::discard_rollback();
+
+        self::ajax_send_page(
+            array(
+                'tab'               => 'migration',
+                'wft_sdm_scan'      => '1',
+                'wft_sdm_discarded' => (string) $removed,
+            ),
+            array( 'migration' => array( 'discarded' => $removed ) )
         );
     }
 
@@ -363,7 +494,7 @@ final class WFT_Admin {
         $_GET = $old_get;
 
         $tab = isset( $query['tab'] ) ? sanitize_key( (string) $query['tab'] ) : 'tracked';
-        if ( ! in_array( $tab, array( 'tracked', 'analytics', 'updates' ), true ) ) {
+        if ( ! in_array( $tab, self::available_tabs(), true ) ) {
             $tab = 'tracked';
         }
 
@@ -371,6 +502,10 @@ final class WFT_Admin {
             'page' => self::PAGE_SLUG,
             'tab'  => $tab,
         );
+
+        if ( 'migration' === $tab && ! empty( $query['wft_sdm_scan'] ) ) {
+            $url_args['wft_sdm_scan'] = '1';
+        }
 
         if ( 'tracked' === $tab ) {
             $total_pages = max( 1, (int) ceil( WFT_Downloads::get_count() / self::PER_PAGE ) );
@@ -527,6 +662,10 @@ final class WFT_Admin {
 
         check_admin_referer( 'wft_generate_test_rows' );
 
+        if ( ! wft_test_rows_enabled() ) {
+            wp_die( esc_html__( 'The test row generator is disabled.', 'wp-filetrace' ) );
+        }
+
         $created = WFT_Downloads::create_test_rows( 200 );
         $redirect = add_query_arg(
             array(
@@ -584,6 +723,32 @@ final class WFT_Admin {
         exit;
     }
 
+    public static function save_settings(): void {
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_die( esc_html__( 'Permission denied.', 'wp-filetrace' ) );
+        }
+
+        check_admin_referer( 'wft_save_settings' );
+
+        $migration_enabled = ! empty( $_POST['wft_enable_sdm_migration'] );
+        $test_rows_enabled = ! empty( $_POST['wft_enable_test_rows'] );
+
+        update_option( 'wft_enable_sdm_migration', $migration_enabled ? '1' : '0', false );
+        update_option( 'wft_enable_test_rows', $test_rows_enabled ? '1' : '0', false );
+
+        wp_safe_redirect(
+            add_query_arg(
+                array(
+                    'page'                => self::PAGE_SLUG,
+                    'tab'                 => 'settings',
+                    'wft_settings_notice' => 'saved',
+                ),
+                admin_url( 'admin.php' )
+            )
+        );
+        exit;
+    }
+
     public static function check_updates(): void {
         if ( ! current_user_can( 'manage_options' ) ) {
             wp_die( esc_html__( 'Permission denied.', 'wp-filetrace' ) );
@@ -609,12 +774,110 @@ final class WFT_Admin {
         exit;
     }
 
+    public static function sdm_scan(): void {
+        self::migration_enabled_or_error();
+
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_die( esc_html__( 'Permission denied.', 'wp-filetrace' ) );
+        }
+
+        check_admin_referer( 'wft_sdm_scan' );
+        wp_safe_redirect(
+            add_query_arg(
+                array(
+                    'page'          => self::PAGE_SLUG,
+                    'tab'           => 'migration',
+                    'wft_sdm_scan'  => '1',
+                ),
+                admin_url( 'admin.php' )
+            )
+        );
+        exit;
+    }
+
+    public static function sdm_apply(): void {
+        self::migration_enabled_or_error();
+
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_die( esc_html__( 'Permission denied.', 'wp-filetrace' ) );
+        }
+
+        check_admin_referer( 'wft_sdm_apply' );
+        WFT_SDM_Migration::apply_safe_replacements();
+
+        wp_safe_redirect(
+            add_query_arg(
+                array(
+                    'page'             => self::PAGE_SLUG,
+                    'tab'              => 'migration',
+                    'wft_sdm_scan'     => '1',
+                    'wft_sdm_applied'  => '1',
+                ),
+                admin_url( 'admin.php' )
+            )
+        );
+        exit;
+    }
+
+    public static function sdm_rollback(): void {
+        self::migration_enabled_or_error();
+
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_die( esc_html__( 'Permission denied.', 'wp-filetrace' ) );
+        }
+
+        check_admin_referer( 'wft_sdm_rollback' );
+        WFT_SDM_Migration::rollback();
+
+        wp_safe_redirect(
+            add_query_arg(
+                array(
+                    'page'                 => self::PAGE_SLUG,
+                    'tab'                  => 'migration',
+                    'wft_sdm_scan'         => '1',
+                    'wft_sdm_rolledback'   => '1',
+                ),
+                admin_url( 'admin.php' )
+            )
+        );
+        exit;
+    }
+
+    public static function sdm_discard_rollback(): void {
+        self::migration_enabled_or_error();
+
+        if ( ! current_user_can( 'manage_options' ) ) {
+            wp_die( esc_html__( 'Permission denied.', 'wp-filetrace' ) );
+        }
+
+        check_admin_referer( 'wft_sdm_discard_rollback' );
+        $removed = WFT_SDM_Migration::discard_rollback();
+
+        wp_safe_redirect(
+            add_query_arg(
+                array(
+                    'page'               => self::PAGE_SLUG,
+                    'tab'                => 'migration',
+                    'wft_sdm_scan'       => '1',
+                    'wft_sdm_discarded'  => $removed,
+                ),
+                admin_url( 'admin.php' )
+            )
+        );
+        exit;
+    }
+
     private static function render_tabs( string $active_tab ): void {
         $tabs = array(
             'tracked'   => __( 'Tracked Files', 'wp-filetrace' ),
             'analytics' => __( 'Analytics', 'wp-filetrace' ),
             'updates'   => __( 'Updates', 'wp-filetrace' ),
+            'settings'  => __( 'Settings', 'wp-filetrace' ),
         );
+
+        if ( wft_sdm_migration_enabled() ) {
+            $tabs['migration'] = __( 'Migration', 'wp-filetrace' );
+        }
         ?>
         <nav class="wft-tabs" aria-label="<?php esc_attr_e( 'WP FileTrace sections', 'wp-filetrace' ); ?>">
             <?php foreach ( $tabs as $tab => $label ) : ?>
@@ -929,6 +1192,357 @@ final class WFT_Admin {
         <?php
     }
 
+    private static function render_settings_page(): void {
+        $migration_enabled = wft_sdm_migration_enabled();
+        $test_rows_enabled = wft_test_rows_enabled();
+        $notice = isset( $_GET['wft_settings_notice'] ) ? sanitize_key( wp_unslash( $_GET['wft_settings_notice'] ) ) : '';
+        ?>
+        <div class="wrap wft-wrap">
+            <header class="wft-page-header">
+                <div class="wft-brand">
+                    <div class="wft-logo-shell">
+                        <img src="<?php echo esc_url( WFT_URL . 'assets/images/logo--wp-filetrace.svg' ); ?>" alt="<?php esc_attr_e( 'WP FileTrace', 'wp-filetrace' ); ?>">
+                    </div>
+                    <div class="wft-info-shell">
+                        <h1><?php esc_html_e( 'WP FileTrace', 'wp-filetrace' ); ?></h1>
+                        <p class="quip"><?php esc_html_e( 'Create tracked download links, monitor usage, and export download data.', 'wp-filetrace' ); ?></p>
+                    </div>
+                </div>
+                <a class="wft-asenka-link" href="https://asenka.com/" target="_blank" rel="noopener noreferrer">Asenka.com ↗</a>
+            </header>
+
+            <?php self::render_tabs( 'settings' ); ?>
+
+            <?php if ( 'saved' === $notice ) : ?>
+                <div class="notice notice-success is-dismissible"><p><?php esc_html_e( 'WP FileTrace settings saved.', 'wp-filetrace' ); ?></p></div>
+            <?php endif; ?>
+
+            <section class="wft-card wft-settings-card">
+                <div class="wft-card-heading">
+                    <div>
+                        <span class="wft-eyebrow"><?php esc_html_e( 'Settings', 'wp-filetrace' ); ?></span>
+                        <h2><?php esc_html_e( 'Beta Features', 'wp-filetrace' ); ?></h2>
+                    </div>
+                </div>
+
+                <div class="wft-beta-warning">
+                    <span class="wft-beta-badge">BETA</span>
+                    <div>
+                        <strong><?php esc_html_e( 'Beta features are experimental and not fully fleshed out.', 'wp-filetrace' ); ?></strong>
+                        <span><?php esc_html_e( 'Enable them only when you need the feature and test on a backed-up/staging copy of the site first.', 'wp-filetrace' ); ?></span>
+                    </div>
+                </div>
+
+                <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="wft-settings-form">
+                    <input type="hidden" name="action" value="wft_save_settings">
+                    <?php wp_nonce_field( 'wft_save_settings' ); ?>
+
+                    <div class="wft-beta-feature-row">
+                        <label for="wft-enable-sdm-migration" class="wft-beta-feature-toggle">
+                            <input type="checkbox" id="wft-enable-sdm-migration" name="wft_enable_sdm_migration" value="1" <?php checked( $migration_enabled ); ?>>
+                            <span>
+                                <strong><?php esc_html_e( 'Enable Simple Download Monitor Migration', 'wp-filetrace' ); ?></strong>
+                                <span class="wft-beta-badge">BETA</span>
+                            </span>
+                        </label>
+                        <p class="description"><?php esc_html_e( 'Currently supports migration from Simple Download Monitor (SDM) only. Enabling this setting adds the Migration tab, where SDM shortcodes can be scanned, reviewed, and migrated into WP FileTrace.', 'wp-filetrace' ); ?></p>
+                    </div>
+
+                    <div class="wft-settings-subsection">
+                        <span class="wft-eyebrow"><?php esc_html_e( 'Developer / Testing Tools', 'wp-filetrace' ); ?></span>
+                        <h3><?php esc_html_e( 'Testing Utilities', 'wp-filetrace' ); ?></h3>
+                        <p class="description"><?php esc_html_e( 'These controls expose utilities intended for development and interface testing, not normal production use.', 'wp-filetrace' ); ?></p>
+                    </div>
+
+                    <div class="wft-beta-feature-row">
+                        <label for="wft-enable-test-rows" class="wft-beta-feature-toggle">
+                            <input type="checkbox" id="wft-enable-test-rows" name="wft_enable_test_rows" value="1" <?php checked( $test_rows_enabled ); ?>>
+                            <span>
+                                <strong><?php esc_html_e( 'Enable Test Row Generator', 'wp-filetrace' ); ?></strong>
+                                <span class="wft-beta-badge">DEV</span>
+                            </span>
+                        </label>
+                        <p class="description"><?php esc_html_e( 'Shows the Generate 200 Test Rows button on the Tracked Files tab for testing sorting, pagination, and bulk actions. Leave this disabled on normal production sites.', 'wp-filetrace' ); ?></p>
+                    </div>
+
+                    <p class="wft-settings-actions">
+                        <button type="submit" class="button button-primary"><?php esc_html_e( 'Save Settings', 'wp-filetrace' ); ?></button>
+                        <?php if ( $migration_enabled ) : ?>
+                            <a class="button" href="<?php echo esc_url( add_query_arg( array( 'page' => self::PAGE_SLUG, 'tab' => 'migration' ), admin_url( 'admin.php' ) ) ); ?>"><?php esc_html_e( 'Open Migration', 'wp-filetrace' ); ?></a>
+                        <?php endif; ?>
+                    </p>
+                </form>
+            </section>
+
+            <footer class="wft-footer">
+                <span><?php echo esc_html( sprintf( __( 'WP FileTrace v%s', 'wp-filetrace' ), WFT_VERSION ) ); ?></span>
+                <span>•</span>
+                <span><?php esc_html_e( 'Primary Developer: Brian McLendon', 'wp-filetrace' ); ?></span>
+                <span>•</span>
+                <a href="https://asenka.com/" target="_blank" rel="noopener noreferrer">Asenka.com</a>
+            </footer>
+        </div>
+        <?php
+    }
+
+    private static function render_migration_page(): void {
+        if ( ! wft_sdm_migration_enabled() || ! class_exists( 'WFT_SDM_Migration' ) ) {
+            self::render_settings_page();
+            return;
+        }
+
+        $should_scan = isset( $_GET['wft_sdm_scan'] ) && '1' === sanitize_key( wp_unslash( $_GET['wft_sdm_scan'] ) );
+        $scan        = $should_scan ? WFT_SDM_Migration::scan_site() : null;
+        $rollback    = WFT_SDM_Migration::get_rollback_state();
+        $last_run    = WFT_SDM_Migration::get_last_run();
+        ?>
+        <div class="wrap wft-wrap">
+            <header class="wft-page-header">
+                <div class="wft-brand">
+                    <div class="wft-logo-shell">
+                        <img src="<?php echo esc_url( WFT_URL . 'assets/images/logo--wp-filetrace.svg' ); ?>" alt="<?php esc_attr_e( 'WP FileTrace', 'wp-filetrace' ); ?>">
+                    </div>
+                    <div class="wft-info-shell">
+                        <h1><?php esc_html_e( 'WP FileTrace', 'wp-filetrace' ); ?></h1>
+                        <p class="quip"><?php esc_html_e( 'Create tracked download links, monitor usage, and export download data.', 'wp-filetrace' ); ?></p>
+                    </div>
+                </div>
+                <a class="wft-asenka-link" href="https://asenka.com/" target="_blank" rel="noopener noreferrer">Asenka.com ↗</a>
+            </header>
+
+            <?php self::render_tabs( 'migration' ); ?>
+
+            <?php if ( isset( $_GET['wft_sdm_applied'] ) && isset( $last_run['shortcodes_changed'] ) ) : ?>
+                <div class="notice <?php echo ! empty( $last_run['failed'] ) ? 'notice-warning' : 'notice-success'; ?> is-dismissible">
+                    <p>
+                        <?php
+                        printf(
+                            esc_html__( 'Migration applied: %1$d SDM shortcode(s) replaced across %2$d content item(s). %3$d WP FileTrace tracker(s) created, %4$d reused, %5$d operation(s) failed.', 'wp-filetrace' ),
+                            (int) $last_run['shortcodes_changed'],
+                            (int) $last_run['posts_changed'],
+                            (int) $last_run['trackers_created'],
+                            (int) $last_run['trackers_reused'],
+                            (int) $last_run['failed']
+                        );
+                        ?>
+                    </p>
+                </div>
+            <?php endif; ?>
+
+            <?php if ( isset( $_GET['wft_sdm_rolledback'] ) && isset( $last_run['rollback'] ) ) : ?>
+                <div class="notice <?php echo ! empty( $last_run['rollback']['failed'] ) ? 'notice-warning' : 'notice-success'; ?> is-dismissible">
+                    <p>
+                        <?php
+                        printf(
+                            esc_html__( 'Migration rollback restored %1$d content item(s); %2$d restore operation(s) failed. WP FileTrace tracker records were intentionally left in place.', 'wp-filetrace' ),
+                            (int) ( $last_run['rollback']['restored'] ?? 0 ),
+                            (int) ( $last_run['rollback']['failed'] ?? 0 )
+                        );
+                        ?>
+                    </p>
+                </div>
+            <?php endif; ?>
+
+            <?php if ( isset( $_GET['wft_sdm_discarded'] ) ) : ?>
+                <div class="notice notice-success is-dismissible">
+                    <p><?php echo esc_html( sprintf( __( 'Migration rollback backup discarded for %d content item(s). Current content was not changed.', 'wp-filetrace' ), absint( $_GET['wft_sdm_discarded'] ) ) ); ?></p>
+                </div>
+            <?php endif; ?>
+
+            <section class="wft-card wft-migration-card">
+                <div class="wft-card-heading">
+                    <div>
+                        <span class="wft-eyebrow"><?php esc_html_e( 'Beta Feature', 'wp-filetrace' ); ?></span>
+                        <h2><?php esc_html_e( 'Simple Download Monitor Migration', 'wp-filetrace' ); ?></h2>
+                    </div>
+                </div>
+
+                <div class="wft-beta-warning wft-migration-beta-warning">
+                    <span class="wft-beta-badge">BETA</span>
+                    <div>
+                        <strong><?php esc_html_e( 'This migration tool is a beta feature and currently supports Simple Download Monitor only.', 'wp-filetrace' ); ?></strong>
+                        <span><?php esc_html_e( 'The workflow is intentionally conservative and may require manual review for unsupported SDM setups or page-builder data.', 'wp-filetrace' ); ?></span>
+                    </div>
+                </div>
+
+                <div class="wft-migration-warning">
+                    <strong><?php esc_html_e( 'Use a site/database backup before applying changes.', 'wp-filetrace' ); ?></strong>
+                    <span><?php esc_html_e( 'Scan Site is a dry run: it does not create trackers or edit content. Apply Safe Replacements only changes rows marked Ready and stores an internal rollback copy of each affected post_content value.', 'wp-filetrace' ); ?></span>
+                </div>
+
+                <div class="wft-migration-scope">
+                    <p><?php esc_html_e( 'This migration targets individual [sdm_download] and legacy [sdm-download] shortcodes. It resolves each SDM item through its stored file URL, maps Media Library files back to attachment IDs when possible, preserves button text, and creates or reuses the corresponding WP FileTrace tracker.', 'wp-filetrace' ); ?></p>
+                    <p><?php esc_html_e( 'Post-meta/page-builder references are reported but never automatically modified. SDM counter/info/category shortcodes and direct SDM process URLs are not replaced by this pass.', 'wp-filetrace' ); ?></p>
+                </div>
+
+                <div class="wft-migration-actions">
+                    <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="wft-sdm-scan-form">
+                        <input type="hidden" name="action" value="wft_sdm_scan">
+                        <?php wp_nonce_field( 'wft_sdm_scan' ); ?>
+                        <button type="submit" class="button button-primary">
+                            <span class="dashicons dashicons-search" aria-hidden="true"></span>
+                            <?php esc_html_e( 'Scan Site / Dry Run', 'wp-filetrace' ); ?>
+                        </button>
+                    </form>
+
+                    <?php if ( $scan && ! empty( $scan['ready'] ) ) : ?>
+                        <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="wft-sdm-apply-form">
+                            <input type="hidden" name="action" value="wft_sdm_apply">
+                            <?php wp_nonce_field( 'wft_sdm_apply' ); ?>
+                            <button type="submit" class="button button-secondary">
+                                <span class="dashicons dashicons-migrate" aria-hidden="true"></span>
+                                <?php echo esc_html( sprintf( __( 'Apply %d Safe Replacement(s)', 'wp-filetrace' ), (int) $scan['ready'] ) ); ?>
+                            </button>
+                        </form>
+                    <?php endif; ?>
+                </div>
+            </section>
+
+            <?php if ( ! empty( $rollback['post_ids'] ) ) : ?>
+                <section class="wft-card wft-migration-rollback-card">
+                    <div class="wft-card-heading">
+                        <div>
+                            <span class="wft-eyebrow"><?php esc_html_e( 'Safety Net', 'wp-filetrace' ); ?></span>
+                            <h2><?php esc_html_e( 'Migration Rollback Available', 'wp-filetrace' ); ?></h2>
+                        </div>
+                    </div>
+                    <p>
+                        <?php
+                        echo esc_html(
+                            sprintf(
+                                __( 'Original post content is currently backed up for %1$d item(s)%2$s.', 'wp-filetrace' ),
+                                count( $rollback['post_ids'] ),
+                                ! empty( $rollback['created_at'] ) ? ' (' . $rollback['created_at'] . ')' : ''
+                            )
+                        );
+                        ?>
+                    </p>
+                    <p class="description"><?php esc_html_e( 'Rollback restores the original post content from before the first migration change and intentionally leaves WP FileTrace tracker records in place. Any later manual edits made to those same content items after migration would also be replaced by the rollback copy, so verify before using it.', 'wp-filetrace' ); ?></p>
+                    <div class="wft-migration-actions">
+                        <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="wft-sdm-rollback-form">
+                            <input type="hidden" name="action" value="wft_sdm_rollback">
+                            <?php wp_nonce_field( 'wft_sdm_rollback' ); ?>
+                            <button type="submit" class="button wft-warning-button"><?php esc_html_e( 'Roll Back Content Changes', 'wp-filetrace' ); ?></button>
+                        </form>
+                        <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="wft-sdm-discard-form">
+                            <input type="hidden" name="action" value="wft_sdm_discard_rollback">
+                            <?php wp_nonce_field( 'wft_sdm_discard_rollback' ); ?>
+                            <button type="submit" class="button"><?php esc_html_e( 'Discard Rollback Backup', 'wp-filetrace' ); ?></button>
+                        </form>
+                    </div>
+                </section>
+            <?php endif; ?>
+
+            <?php if ( $scan ) : ?>
+                <section class="wft-card wft-migration-results-card">
+                    <div class="wft-card-heading">
+                        <div>
+                            <span class="wft-eyebrow"><?php esc_html_e( 'Dry Run Results', 'wp-filetrace' ); ?></span>
+                            <h2><?php esc_html_e( 'Proposed Replacements', 'wp-filetrace' ); ?></h2>
+                        </div>
+                    </div>
+
+                    <div class="wft-migration-metrics">
+                        <div class="wft-migration-metric"><span><?php esc_html_e( 'Found', 'wp-filetrace' ); ?></span><strong><?php echo number_format_i18n( (int) $scan['total'] ); ?></strong></div>
+                        <div class="wft-migration-metric is-ready"><span><?php esc_html_e( 'Ready', 'wp-filetrace' ); ?></span><strong><?php echo number_format_i18n( (int) $scan['ready'] ); ?></strong></div>
+                        <div class="wft-migration-metric is-review"><span><?php esc_html_e( 'Needs Review', 'wp-filetrace' ); ?></span><strong><?php echo number_format_i18n( (int) $scan['review'] ); ?></strong></div>
+                        <div class="wft-migration-metric"><span><?php esc_html_e( 'Will Create', 'wp-filetrace' ); ?></span><strong><?php echo number_format_i18n( (int) $scan['create'] ); ?></strong></div>
+                        <div class="wft-migration-metric"><span><?php esc_html_e( 'Will Reuse', 'wp-filetrace' ); ?></span><strong><?php echo number_format_i18n( (int) $scan['reuse'] ); ?></strong></div>
+                    </div>
+
+                    <?php if ( ! empty( $scan['related_count'] ) ) : ?>
+                        <div class="notice notice-info inline">
+                            <p><?php echo esc_html( sprintf( __( '%d content item(s) also contain related SDM counter/info/link shortcodes. Those usages are intentionally not changed by this migration.', 'wp-filetrace' ), (int) $scan['related_count'] ) ); ?></p>
+                        </div>
+                    <?php endif; ?>
+
+                    <?php if ( ! empty( $scan['meta_reference_count'] ) ) : ?>
+                        <div class="notice notice-warning inline">
+                            <p><?php echo esc_html( sprintf( __( '%d SDM shortcode reference(s) were found in post meta/page-builder data. They are listed below as Needs Review and will not be auto-edited.', 'wp-filetrace' ), (int) $scan['meta_reference_count'] ) ); ?></p>
+                        </div>
+                    <?php endif; ?>
+
+                    <div class="wft-table-wrap wft-migration-table-wrap">
+                        <table class="widefat wft-table wft-migration-table">
+                            <thead>
+                                <tr>
+                                    <th><?php esc_html_e( 'Content', 'wp-filetrace' ); ?></th>
+                                    <th><?php esc_html_e( 'SDM Item', 'wp-filetrace' ); ?></th>
+                                    <th><?php esc_html_e( 'File', 'wp-filetrace' ); ?></th>
+                                    <th><?php esc_html_e( 'Current Shortcode', 'wp-filetrace' ); ?></th>
+                                    <th><?php esc_html_e( 'WP FileTrace Replacement', 'wp-filetrace' ); ?></th>
+                                    <th><?php esc_html_e( 'Tracker', 'wp-filetrace' ); ?></th>
+                                    <th><?php esc_html_e( 'Status / Notes', 'wp-filetrace' ); ?></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php if ( empty( $scan['items'] ) ) : ?>
+                                    <tr><td colspan="7" class="wft-empty-state"><?php esc_html_e( 'No individual Simple Download Monitor download shortcodes were found in post content or post meta.', 'wp-filetrace' ); ?></td></tr>
+                                <?php else : ?>
+                                    <?php foreach ( $scan['items'] as $item ) : ?>
+                                        <?php
+                                        $edit_link = get_edit_post_link( (int) $item['post_id'], '' );
+                                        $file_name = ! empty( $item['file_url'] ) ? wp_basename( (string) wp_parse_url( $item['file_url'], PHP_URL_PATH ) ) : '—';
+                                        ?>
+                                        <tr>
+                                            <td>
+                                                <?php if ( $edit_link ) : ?>
+                                                    <a class="wft-file-title" href="<?php echo esc_url( $edit_link ); ?>" target="_blank" rel="noopener noreferrer"><?php echo esc_html( $item['post_title'] ); ?> ↗</a>
+                                                <?php else : ?>
+                                                    <strong><?php echo esc_html( $item['post_title'] ); ?></strong>
+                                                <?php endif; ?>
+                                                <span class="wft-meta"><?php echo esc_html( $item['post_type'] . ' #' . (int) $item['post_id'] . ' · ' . $item['post_status'] ); ?></span>
+                                                <?php if ( 'post_meta' === $item['source_type'] ) : ?>
+                                                    <span class="wft-meta"><?php echo esc_html( 'meta: ' . $item['meta_key'] ); ?></span>
+                                                <?php endif; ?>
+                                            </td>
+                                            <td>
+                                                <?php if ( ! empty( $item['sdm_id'] ) ) : ?><strong>#<?php echo (int) $item['sdm_id']; ?></strong><?php endif; ?>
+                                                <?php if ( ! empty( $item['sdm_title'] ) ) : ?><span class="wft-meta"><?php echo esc_html( $item['sdm_title'] ); ?></span><?php endif; ?>
+                                            </td>
+                                            <td>
+                                                <?php if ( ! empty( $item['file_url'] ) ) : ?>
+                                                    <a href="<?php echo esc_url( $item['file_url'] ); ?>" target="_blank" rel="noopener noreferrer"><?php echo esc_html( $file_name ?: $item['file_url'] ); ?> ↗</a>
+                                                    <?php if ( ! empty( $item['attachment_id'] ) ) : ?><span class="wft-meta">Media #<?php echo (int) $item['attachment_id']; ?></span><?php endif; ?>
+                                                <?php else : ?>—<?php endif; ?>
+                                            </td>
+                                            <td><code class="wft-migration-code"><?php echo esc_html( $item['original'] ); ?></code></td>
+                                            <td><?php echo ! empty( $item['proposed'] ) ? '<code class="wft-migration-code">' . esc_html( $item['proposed'] ) . '</code>' : '—'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?></td>
+                                            <td>
+                                                <?php if ( 'reuse' === $item['tracker_state'] ) : ?>
+                                                    <span class="wft-migration-badge is-reuse"><?php echo esc_html( sprintf( __( 'Reuse #%d', 'wp-filetrace' ), (int) $item['tracker_id'] ) ); ?></span>
+                                                <?php elseif ( 'create' === $item['tracker_state'] ) : ?>
+                                                    <span class="wft-migration-badge is-create"><?php esc_html_e( 'Create', 'wp-filetrace' ); ?></span>
+                                                <?php else : ?>—<?php endif; ?>
+                                            </td>
+                                            <td>
+                                                <span class="wft-migration-badge <?php echo ! empty( $item['ready'] ) ? 'is-ready' : 'is-review'; ?>">
+                                                    <?php echo ! empty( $item['ready'] ) ? esc_html__( 'Ready', 'wp-filetrace' ) : esc_html__( 'Needs Review', 'wp-filetrace' ); ?>
+                                                </span>
+                                                <ul class="wft-migration-notes">
+                                                    <?php foreach ( $item['notes'] as $note ) : ?><li><?php echo esc_html( $note ); ?></li><?php endforeach; ?>
+                                                </ul>
+                                            </td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                <?php endif; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            <?php endif; ?>
+
+            <footer class="wft-footer">
+                <span><?php echo esc_html( sprintf( __( 'WP FileTrace v%s', 'wp-filetrace' ), WFT_VERSION ) ); ?></span>
+                <span>•</span>
+                <span><?php esc_html_e( 'Primary Developer: Brian McLendon', 'wp-filetrace' ); ?></span>
+                <span>•</span>
+                <a href="https://asenka.com/" target="_blank" rel="noopener noreferrer">Asenka.com</a>
+            </footer>
+        </div>
+        <?php
+    }
+
     public static function render_page(): void {
         if ( ! current_user_can( 'manage_options' ) ) {
             return;
@@ -941,6 +1555,18 @@ final class WFT_Admin {
         }
         if ( 'updates' === $tab ) {
             self::render_updates_page();
+            return;
+        }
+        if ( 'settings' === $tab ) {
+            self::render_settings_page();
+            return;
+        }
+        if ( 'migration' === $tab ) {
+            if ( wft_sdm_migration_enabled() ) {
+                self::render_migration_page();
+            } else {
+                self::render_settings_page();
+            }
             return;
         }
 
@@ -1132,11 +1758,13 @@ final class WFT_Admin {
                         <h2><?php esc_html_e( 'Tracked Files', 'wp-filetrace' ); ?></h2>
                     </div>
                     <div class="wft-table-tools">
-                        <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="wft-test-form">
-                            <input type="hidden" name="action" value="wft_generate_test_rows">
-                            <?php wp_nonce_field( 'wft_generate_test_rows' ); ?>
-                            <button type="submit" class="button wft-test-button"><?php esc_html_e( 'Generate 200 Test Rows', 'wp-filetrace' ); ?></button>
-                        </form>
+                        <?php if ( wft_test_rows_enabled() ) : ?>
+                            <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="wft-test-form">
+                                <input type="hidden" name="action" value="wft_generate_test_rows">
+                                <?php wp_nonce_field( 'wft_generate_test_rows' ); ?>
+                                <button type="submit" class="button wft-test-button"><?php esc_html_e( 'Generate 200 Test Rows', 'wp-filetrace' ); ?></button>
+                            </form>
+                        <?php endif; ?>
 
                         <form id="wft-bulk-delete-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="wft-bulk-delete-form">
                             <input type="hidden" name="action" value="wft_delete_selected_trackers">

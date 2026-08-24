@@ -38,7 +38,14 @@ function wft_uninstall_site_data(): void {
     delete_option( 'wft_ga_global_snippet' );
     delete_option( 'wft_ga_event_snippet' );
     delete_option( 'wft_ga_filename_parameter' );
+    delete_option( 'wft_sdm_migration_rollback' );
+    delete_option( 'wft_sdm_migration_last_run' );
+    delete_option( 'wft_enable_sdm_migration' );
+    delete_option( 'wft_enable_test_rows' );
     delete_option( 'adt_db_version' );
+
+    // Temporary SDM migration rollback backups are plugin-owned post meta.
+    delete_post_meta_by_key( '_wft_sdm_migration_original_content' );
 }
 
 if ( is_multisite() ) {
@@ -60,6 +67,10 @@ if ( is_multisite() ) {
     delete_site_option( 'wft_ga_global_snippet' );
     delete_site_option( 'wft_ga_event_snippet' );
     delete_site_option( 'wft_ga_filename_parameter' );
+    delete_site_option( 'wft_sdm_migration_rollback' );
+    delete_site_option( 'wft_sdm_migration_last_run' );
+    delete_site_option( 'wft_enable_sdm_migration' );
+    delete_site_option( 'wft_enable_test_rows' );
     delete_site_option( 'adt_db_version' );
 } else {
     wft_uninstall_site_data();

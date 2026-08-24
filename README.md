@@ -40,6 +40,10 @@ Primary Developer: **Brian McLendon** - [u/eyeofbri](https://github.com/eyeofbri
 - Check GitHub Releases for new WP FileTrace versions and surface updates through the normal WordPress plugin updater.
 - View installed/latest versions, connection status, and last GitHub check from the WP FileTrace **Updates** tab.
 - Force an immediate GitHub release check with **Check for Updates**, bypassing the normal one-hour WP FileTrace release cache.
+- Optionally enable the **Simple Download Monitor Migration (Beta)** feature from Settings to scan and migrate individual `[sdm_download]` / `[sdm-download]` shortcodes into WP FileTrace trackers and `[wft]` shortcodes.
+- Preview SDM migrations as a dry run before any tracker/content changes are made.
+- Flag password-protected, unpublished, behavior-changing, or post-meta/page-builder SDM usages for manual review instead of replacing them blindly.
+- Keep rollback copies of affected `post_content` values until the migration is verified or the backup is explicitly discarded.
 
 ## Shortcodes
 
@@ -77,7 +81,7 @@ This keeps reporting consolidated even when the same file is shared in multiple 
 
 Open **WP FileTrace** from the WordPress admin menu.
 
-The plugin interface contains three tabs. In JavaScript-enabled wp-admin sessions, switching tabs happens in place without a full page reload:
+The plugin interface contains four standard tabs, plus a fifth Migration tab when the SDM migration beta is enabled. In JavaScript-enabled wp-admin sessions, switching tabs happens in place without a full page reload:
 
 ### Tracked Files
 
@@ -134,6 +138,31 @@ The **Check for Updates** button clears WP FileTrace's GitHub-release cache and 
 
 Automatic GitHub release metadata is cached for up to one hour.
 
+
+### Settings
+
+The Settings tab contains optional plugin features that are not required for normal download tracking.
+
+#### Beta Features
+
+**Enable Simple Download Monitor Migration** is clearly marked as a beta/experimental feature. It is disabled by default. Turning it on adds the **Migration** tab to WP FileTrace; turning it off hides that tab and prevents the SDM migration handlers from loading on subsequent requests.
+
+The current migration beta supports **Simple Download Monitor (SDM) only**. Additional migration sources may be added later without making the migration utility part of the normal WP FileTrace workflow.
+
+### Migration
+
+The **Migration (Beta)** tab provides a Simple Download Monitor migration assistant for sites moving existing individual download shortcodes to WP FileTrace.
+
+**Scan Site / Dry Run** searches normal WordPress `post_content` for `[sdm_download]` and the legacy `[sdm-download]` alias. It resolves the SDM download ID through the `sdm_downloads` post and its `sdm_upload` file URL, maps the URL back to a Media Library attachment when possible, preserves download button text, and previews the proposed `[wft]` replacement. The dry run does not create trackers or edit content.
+
+Rows are marked **Ready** only when WP FileTrace can perform a conservative one-to-one migration. Password-protected/unpublished SDM items, behavior-changing unsupported shortcode attributes, and globally enabled SDM Terms & Conditions or reCAPTCHA are marked **Needs Review** and are not auto-migrated. `fancy` templates can be migrated, but their SDM template presentation is replaced by the normal WP FileTrace download button and is called out in the dry-run notes.
+
+Shortcode references found in post meta/page-builder data are report-only and are never automatically edited. SDM counter/info/category shortcodes and direct SDM process URLs are outside this migration pass.
+
+**Apply Safe Replacements** creates or reuses the corresponding WP FileTrace tracker and updates only Ready shortcodes in `post_content`. Before the first change to each content item, WP FileTrace stores an internal rollback copy of its original `post_content`. **Roll Back Content Changes** restores those backups; tracker records are intentionally left in place because they may have existed before migration or may already contain download activity. Once the migration has been verified, **Discard Rollback Backup** removes the temporary backups without changing current content.
+
+Historical Simple Download Monitor download counts are not imported by this migration utility.
+
 ## Developer Hooks
 
 WP FileTrace fires the existing server-side download hook after a tracked request is successfully recorded:
@@ -170,7 +199,7 @@ Release workflow:
 
 1. Update the plugin version and `changelog.md`.
 2. Commit and push the version to GitHub.
-3. Create a GitHub Release with a matching tag such as `v0.1.7`.
+3. Create a GitHub Release with a matching tag such as `v0.1.8`.
 4. Publish the release as a normal release, not a draft or prerelease.
 
 Beginning with v0.1.5, no manually uploaded release ZIP is required. The updater uses GitHub's automatically generated release source ZIP and normalizes its extracted repository directory back to `wp-filetrace/` during the WordPress upgrade process.
@@ -186,7 +215,7 @@ Analytics configuration is stored in WordPress options. No visitor IP address or
 
 ## Uninstall Behavior
 
-Deleting WP FileTrace through the WordPress Plugins screen runs `uninstall.php` and permanently removes WP FileTrace tracker/event tables, analytics configuration, and plugin database-version options. Legacy pre-v0.1.2 ADT tables/options are also cleaned up when present.
+Deleting WP FileTrace through the WordPress Plugins screen runs `uninstall.php` and permanently removes WP FileTrace tracker/event tables, analytics configuration, temporary SDM migration state/rollback metadata, and plugin database-version options. Legacy pre-v0.1.2 ADT tables/options are also cleaned up when present.
 
 ## Changelog
 
@@ -195,3 +224,7 @@ See [changelog.md](changelog.md).
 ## License
 
 GPL-2.0-or-later
+
+### Developer / Testing Tools
+
+The Settings tab can optionally expose the **Generate 200 Test Rows** utility for testing sorting, pagination, and bulk actions. It is disabled by default and should normally remain off on production sites.

@@ -115,6 +115,31 @@ final class WFT_Downloads {
         return $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE public_key = %s LIMIT 1", $key ) );
     }
 
+    public static function get_by_destination( int $attachment_id = 0, string $url = '' ) {
+        global $wpdb;
+
+        $url = self::normalize_url( $url );
+        if ( $attachment_id <= 0 && '' === $url ) {
+            return null;
+        }
+
+        $table = WFT_DB::downloads_table();
+        $hash  = self::destination_hash( $attachment_id, $url );
+        $row   = $wpdb->get_row(
+            $wpdb->prepare( "SELECT * FROM {$table} WHERE destination_hash = %s LIMIT 1", $hash )
+        );
+
+        if ( $row || '' === $url ) {
+            return $row;
+        }
+
+        // Migration/helper fallback: older trackers might represent the same file
+        // as a raw URL even when that URL now resolves to a Media Library item.
+        return $wpdb->get_row(
+            $wpdb->prepare( "SELECT * FROM {$table} WHERE file_url = %s ORDER BY id ASC LIMIT 1", $url )
+        );
+    }
+
     public static function get_all(): array {
         global $wpdb;
         $table = WFT_DB::downloads_table();
