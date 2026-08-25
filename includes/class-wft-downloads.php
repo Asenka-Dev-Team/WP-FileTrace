@@ -436,20 +436,21 @@ final class WFT_Downloads {
         return $created;
     }
 
-    public static function build_tracked_url( $tracker, string $source = 'external' ): string {
-        $source = self::sanitize_source( $source );
+    public static function build_tracked_url( $tracker, string $source = 'external', int $via_page_id = 0 ): string {
+        $source      = self::sanitize_source( $source );
+        $via_page_id = absint( $via_page_id );
+        $args        = array( 'via' => $source );
 
-        if ( '' === (string) get_option( 'permalink_structure' ) ) {
-            return add_query_arg(
-                array(
-                    'wft_download_key' => $tracker->public_key,
-                    'via'              => $source,
-                ),
-                home_url( '/' )
-            );
+        if ( $via_page_id > 0 ) {
+            $args['via_page'] = $via_page_id;
         }
 
-        return add_query_arg( 'via', $source, home_url( '/wft-download/' . rawurlencode( $tracker->public_key ) . '/' ) );
+        if ( '' === (string) get_option( 'permalink_structure' ) ) {
+            $args['wft_download_key'] = $tracker->public_key;
+            return add_query_arg( $args, home_url( '/' ) );
+        }
+
+        return add_query_arg( $args, home_url( '/wft-download/' . rawurlencode( $tracker->public_key ) . '/' ) );
     }
 
     public static function shortcode_for( $tracker, string $button_text = '' ): string {

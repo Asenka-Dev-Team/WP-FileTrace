@@ -55,8 +55,19 @@ final class WFT_Router {
             self::redirect_to_file( $tracker );
         }
 
-        $source  = isset( $_GET['via'] ) ? sanitize_key( wp_unslash( $_GET['via'] ) ) : 'external';
-        $tracked = false;
+        $source       = isset( $_GET['via'] ) ? sanitize_key( wp_unslash( $_GET['via'] ) ) : 'external';
+        $via_page_id  = isset( $_GET['via_page'] ) ? absint( wp_unslash( $_GET['via_page'] ) ) : 0;
+        $via_page_title = '';
+        $tracked      = false;
+
+        if ( $via_page_id > 0 ) {
+            $via_post = get_post( $via_page_id );
+            if ( ! $via_post || ! is_post_publicly_viewable( $via_post ) ) {
+                $via_page_id = 0;
+            } else {
+                $via_page_title = sanitize_text_field( get_the_title( $via_page_id ) );
+            }
+        }
 
         if ( 'GET' === $method && ! self::looks_like_prefetch_or_bot() ) {
             $source  = WFT_Downloads::sanitize_source( $source );
@@ -64,7 +75,7 @@ final class WFT_Router {
         }
 
         if ( $tracked ) {
-            WFT_Download_Page::render_handoff( $tracker, $source );
+            WFT_Download_Page::render_handoff( $tracker, $source, $via_page_id, $via_page_title );
             exit;
         }
 

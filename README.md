@@ -34,12 +34,14 @@ Primary Developer: **Brian McLendon** - [u/eyeofbri](https://github.com/eyeofbri
 - Provide the `wft_download_tracked` action hook for custom integrations.
 - Optionally inject a complete global Google/site tag into frontend page `<head>` output.
 - Optionally execute custom `gtag('event', ...)` JavaScript when a tracked download is recorded.
-- Optionally overwrite chosen event parameters with the stable WP FileTrace tracker ID, actual downloaded file name, and/or download source (`shortcode` or `external`).
+- Optionally overwrite chosen event parameters with the stable WP FileTrace tracker ID, actual downloaded file name, download source (`shortcode` or `external`), and originating WordPress content ID/title when available.
 - Support the analytics event flow for both shortcode and external/email tracked links.
 - Show an improved centered download handoff page for successfully tracked downloads, even when analytics is not configured.
-- Customize the download handoff page with saved HTML/CSS and preview it without incrementing counts or firing analytics.
-- Use download-page template variables for tracker title, actual filename, no-track retry URL, download source, and site name.
-- Provide a delayed manual-download fallback that does not increment counters or fire analytics a second time.
+- Customize the download handoff page with saved HTML/CSS, an optional default-page logo/icon, and an option to hide the built-in site-name label.
+- Preview the saved download page without incrementing counts, starting a file download, or firing analytics.
+- Use download-page template variables for tracker title, actual filename, no-track retry URL, download source, originating page data, site details, and the configured logo URL.
+- Provide a delayed manual-download fallback that does not increment counters or fire analytics a second time, followed by a standalone **Back to main site** link.
+- Fade/remove the built-in loading spinner shortly after the manual fallback becomes available.
 - Include a temporary 200-row synthetic test-data generator for pagination and sorting tests.
 - Check GitHub Releases for new WP FileTrace versions and surface updates through the normal WordPress plugin updater.
 - View installed/latest versions, connection status, last GitHub check, and force update checks from the **Settings** tab.
@@ -158,11 +160,26 @@ download_source
 
 WP FileTrace sets this value to `shortcode` when a visitor clicks a `[wft]` download button and `external` when the shareable/direct tracked link is used. The mapping is optional and independent of the ID and filename mappings.
 
+#### Via Page ID / Title Event Parameters
+
+WP FileTrace can also report which WordPress content item led to the download. Shortcodes automatically include the current singular post/page/CPT ID. A small frontend helper adds the same context to manually embedded same-site WP FileTrace tracked links when they are clicked from WordPress content.
+
+Optional parameter names can be configured for:
+
+```text
+via_page_id
+via_page_title
+```
+
+When page context is known, the ID and current WordPress title are sent with the custom event. Email or otherwise external clicks have no originating WordPress page, so the ID is `0` and the title is empty. `download_id` remains the stable WP FileTrace tracker ID and is not repurposed for page context.
+
 The Global Site Tag, Download Event, and all dynamic parameter mappings remain optional. The Global Site Tag and Download Event can still be configured independently.
 
 ### Download Page
 
-The Download Page tab controls the lightweight frontend handoff shown after WP FileTrace successfully records a download. Leaving both fields blank uses the built-in centered WP FileTrace layout with a minimal card, loading indicator, automatic file start, and delayed manual-download fallback.
+The Download Page tab controls the lightweight frontend handoff shown after WP FileTrace successfully records a download. Leaving the custom HTML/CSS fields blank uses the built-in centered WP FileTrace layout with a minimal card, loading indicator, automatic file start, delayed manual-download fallback, and a small **Back to main site** button below the handoff containers.
+
+The built-in page can optionally show a logo/icon selected or uploaded through the WordPress Media Library. The small default WordPress site-name label can also be hidden independently. The loading spinner fades away shortly after the delayed fallback message appears.
 
 Optional **Custom HTML** replaces the built-in content card. Optional **Custom CSS** loads after WP FileTrace's base handoff styles so the page can be white-labeled without editing plugin files.
 
@@ -172,11 +189,15 @@ Available HTML variables include:
 - `{{file_name}}` — actual filename from the destination URL.
 - `{{download_url}}` — no-track retry URL for custom manual-download links.
 - `{{download_source}}` — `shortcode` or `external`.
+- `{{via_page_id}}` — originating WordPress content ID when known, otherwise `0`.
+- `{{via_page_title}}` — originating WordPress content title when known.
 - `{{site_name}}` — current WordPress site name.
+- `{{site_url}}` — WordPress home/root URL.
+- `{{logo_url}}` — URL for the selected Download Page logo/icon when configured.
 
 **Preview Saved Page** opens an administrator-only preview using sample values. Preview mode does not increment a tracker, start a file download, or run the configured custom `gtag` event.
 
-The automatic download and delayed retry button use a dedicated retry route after the original request has already been counted. Retry requests do not increment WP FileTrace counters, create another event-history row, or fire the configured download analytics event again.
+The automatic download and delayed retry button use a dedicated retry route after the original request has already been counted. Retry requests do not increment WP FileTrace counters, create another event-history row, or fire the configured download analytics event again. The **Back to main site** button links directly to the WordPress home URL and is never part of the tracking flow.
 
 ### Settings
 
@@ -233,7 +254,7 @@ The analytics handoff context can also be modified before browser output with:
 apply_filters( 'wft_analytics_event_context', $context, $tracker, $source );
 ```
 
-The context includes the tracker ID, file name, file URL, source, and configured ID, filename, and source parameter mappings.
+The context includes the tracker ID, file name, file URL, source, originating page ID/title when known, and the configured dynamic event-parameter mappings.
 
 ## Installation
 
@@ -253,7 +274,7 @@ Release workflow:
 
 1. Update the plugin version and `changelog.md`.
 2. Commit and push the version to GitHub.
-3. Create a GitHub Release with a matching version tag such as `v0.1.11`.
+3. Create a GitHub Release with a matching version tag such as `v0.1.12`.
 4. Publish the release as a normal release, not a draft or prerelease.
 
 Beginning with v0.1.5, no manually uploaded release ZIP is required. The updater uses GitHub's automatically generated release source ZIP and normalizes its extracted repository directory back to `wp-filetrace/` during the WordPress upgrade process.
@@ -265,11 +286,11 @@ WP FileTrace uses dedicated WordPress database tables:
 - `{prefix}wft_downloads`
 - `{prefix}wft_download_events`
 
-Analytics and Download Page configuration are stored in WordPress options. No visitor IP address or other personally identifying visitor data is intentionally stored by the current download-tracking implementation.
+Analytics and Download Page configuration (including optional logo/site-name settings) are stored in WordPress options. No visitor IP address or other personally identifying visitor data is intentionally stored by the current download-tracking implementation.
 
 ## Uninstall Behavior
 
-Deleting WP FileTrace through the WordPress Plugins screen runs `uninstall.php` and permanently removes WP FileTrace tracker/event tables, analytics configuration, Download Page HTML/CSS settings, temporary SDM migration state/rollback metadata, rewrite-version state, and plugin database-version options. Legacy pre-v0.1.2 ADT tables/options are also cleaned up when present.
+Deleting WP FileTrace through the WordPress Plugins screen runs `uninstall.php` and permanently removes WP FileTrace tracker/event tables, analytics configuration, Download Page HTML/CSS/branding settings, temporary SDM migration state/rollback metadata, rewrite-version state, and plugin database-version options. Legacy pre-v0.1.2 ADT tables/options are also cleaned up when present.
 
 ## Changelog
 

@@ -12,6 +12,32 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ### Fixed
 
+## [0.1.12] - 2026-08-25
+
+### Added
+
+- Added optional originating WordPress content context for tracked downloads, with separate page/post/CPT ID and title values.
+- Added optional **Via Page ID Event Parameter** and **Via Page Title Event Parameter** mappings for custom Google Analytics / `gtag` events.
+- Added automatic page-context capture to `[wft]` shortcode links and a lightweight frontend helper that adds the current content ID to manually embedded same-site WP FileTrace tracked links.
+- Added `{{via_page_id}}` and `{{via_page_title}}` Download Page template variables.
+- Added an optional WordPress Media Library logo/icon selector for the built-in Download Page.
+- Added a setting to hide the default site-name text on the built-in Download Page while keeping `{{site_name}}` available to custom templates.
+- Added `{{logo_url}}` and `{{site_url}}` Download Page template variables.
+- Added a standalone **Back to main site** button below the download handoff content.
+
+### Changed
+
+- Bumped WP FileTrace to v0.1.12.
+- Kept `download_id` as the stable WP FileTrace tracker ID rather than overloading it with originating-page information.
+- Updated the built-in handoff animation so `.wft-download-spinner` fades/disappears shortly after the manual-download fallback appears.
+- Expanded Analytics event augmentation to include optional originating page ID/title values while preserving existing ID, filename, and source mappings.
+- Expanded Download Page reset/uninstall behavior to clean up the optional logo and site-name-display settings.
+- Updated README documentation for page-context analytics and Download Page branding controls.
+
+### Fixed
+
+- Prevented fallback/manual download navigation and the **Back to main site** control from creating additional WP FileTrace counts or custom analytics events.
+
 ## [0.1.11] - 2026-08-24
 
 ### Added

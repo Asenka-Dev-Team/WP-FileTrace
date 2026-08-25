@@ -15,6 +15,8 @@ final class WFT_Analytics {
     public const OPTION_DOWNLOAD_ID_PARAM   = 'wft_ga_download_id_parameter';
     public const OPTION_FILENAME_PARAM      = 'wft_ga_filename_parameter';
     public const OPTION_SOURCE_PARAM        = 'wft_ga_source_parameter';
+    public const OPTION_VIA_PAGE_ID_PARAM   = 'wft_ga_via_page_id_parameter';
+    public const OPTION_VIA_PAGE_TITLE_PARAM = 'wft_ga_via_page_title_parameter';
 
     /**
      * Register frontend analytics output.
@@ -43,6 +45,14 @@ final class WFT_Analytics {
         return self::sanitize_parameter_name( (string) get_option( self::OPTION_SOURCE_PARAM, '' ) );
     }
 
+    public static function get_via_page_id_parameter(): string {
+        return self::sanitize_parameter_name( (string) get_option( self::OPTION_VIA_PAGE_ID_PARAM, '' ) );
+    }
+
+    public static function get_via_page_title_parameter(): string {
+        return self::sanitize_parameter_name( (string) get_option( self::OPTION_VIA_PAGE_TITLE_PARAM, '' ) );
+    }
+
     public static function has_event_snippet(): bool {
         return '' !== trim( self::get_event_snippet() );
     }
@@ -58,13 +68,17 @@ final class WFT_Analytics {
         string $event_snippet,
         string $download_id_parameter,
         string $filename_parameter,
-        string $source_parameter
+        string $source_parameter,
+        string $via_page_id_parameter = '',
+        string $via_page_title_parameter = ''
     ): void {
         update_option( self::OPTION_GLOBAL_SNIPPET, $global_snippet, false );
         update_option( self::OPTION_EVENT_SNIPPET, $event_snippet, false );
         update_option( self::OPTION_DOWNLOAD_ID_PARAM, self::sanitize_parameter_name( $download_id_parameter ), false );
         update_option( self::OPTION_FILENAME_PARAM, self::sanitize_parameter_name( $filename_parameter ), false );
         update_option( self::OPTION_SOURCE_PARAM, self::sanitize_parameter_name( $source_parameter ), false );
+        update_option( self::OPTION_VIA_PAGE_ID_PARAM, self::sanitize_parameter_name( $via_page_id_parameter ), false );
+        update_option( self::OPTION_VIA_PAGE_TITLE_PARAM, self::sanitize_parameter_name( $via_page_title_parameter ), false );
     }
 
     public static function clear_global_snippet(): void {
@@ -76,6 +90,8 @@ final class WFT_Analytics {
         delete_option( self::OPTION_DOWNLOAD_ID_PARAM );
         delete_option( self::OPTION_FILENAME_PARAM );
         delete_option( self::OPTION_SOURCE_PARAM );
+        delete_option( self::OPTION_VIA_PAGE_ID_PARAM );
+        delete_option( self::OPTION_VIA_PAGE_TITLE_PARAM );
     }
 
     public static function sanitize_parameter_name( string $name ): string {
@@ -105,31 +121,53 @@ final class WFT_Analytics {
     /**
      * Build the runtime values used to augment custom gtag events.
      *
-     * @param object $tracker Tracker database row.
-     * @param string $source  shortcode|external.
+     * @param object $tracker        Tracker database row.
+     * @param string $source         shortcode|external.
+     * @param int    $via_page_id    Originating WordPress content ID, when known.
+     * @param string $via_page_title Originating WordPress content title, when known.
      * @return array<string,mixed>
      */
-    public static function get_event_context( $tracker, string $source ): array {
-        $destination           = esc_url_raw( (string) $tracker->file_url );
-        $download_id           = (int) $tracker->id;
-        $download_id_parameter = self::get_download_id_parameter();
-        $filename_parameter    = self::get_filename_parameter();
-        $source_parameter      = self::get_source_parameter();
-        $file_name             = self::downloaded_file_name( $tracker );
-        $source                = WFT_Downloads::sanitize_source( $source );
+    public static function get_event_context( $tracker, string $source, int $via_page_id = 0, string $via_page_title = '' ): array {
+        $destination             = esc_url_raw( (string) $tracker->file_url );
+        $download_id             = (int) $tracker->id;
+        $download_id_parameter   = self::get_download_id_parameter();
+        $filename_parameter      = self::get_filename_parameter();
+        $source_parameter        = self::get_source_parameter();
+        $via_page_id_parameter   = self::get_via_page_id_parameter();
+        $via_page_title_parameter = self::get_via_page_title_parameter();
+        $file_name               = self::downloaded_file_name( $tracker );
+        $source                  = WFT_Downloads::sanitize_source( $source );
+        $via_page_id             = absint( $via_page_id );
+        $via_page_title          = sanitize_text_field( $via_page_title );
+
+        if ( $via_page_id > 0 && '' === $via_page_title ) {
+            $via_post = get_post( $via_page_id );
+            if ( $via_post && is_post_publicly_viewable( $via_post ) ) {
+                $resolved_title = get_the_title( $via_page_id );
+                if ( is_string( $resolved_title ) ) {
+                    $via_page_title = sanitize_text_field( $resolved_title );
+                }
+            } else {
+                $via_page_id = 0;
+            }
+        }
 
         $context = apply_filters(
             'wft_analytics_event_context',
             array(
-                'download_id'        => $download_id,
-                'file_name'          => $file_name,
-                'file_url'           => $destination,
-                'source'             => $source,
+                'download_id'              => $download_id,
+                'file_name'                => $file_name,
+                'file_url'                 => $destination,
+                'source'                   => $source,
+                'via_page_id'              => $via_page_id,
+                'via_page_title'           => $via_page_title,
                 // `parameter` is retained for backwards compatibility with the v0.1.5 filter shape.
-                'parameter'          => $filename_parameter,
-                'filename_parameter' => $filename_parameter,
-                'id_parameter'       => $download_id_parameter,
-                'source_parameter'   => $source_parameter,
+                'parameter'                => $filename_parameter,
+                'filename_parameter'       => $filename_parameter,
+                'id_parameter'             => $download_id_parameter,
+                'source_parameter'         => $source_parameter,
+                'via_page_id_parameter'    => $via_page_id_parameter,
+                'via_page_title_parameter' => $via_page_title_parameter,
             ),
             $tracker,
             $source
@@ -139,9 +177,11 @@ final class WFT_Analytics {
             $context = array();
         }
 
-        $context['download_id'] = isset( $context['download_id'] ) ? absint( $context['download_id'] ) : $download_id;
-        $context['file_name']   = isset( $context['file_name'] ) ? sanitize_text_field( (string) $context['file_name'] ) : $file_name;
-        $context['source']      = isset( $context['source'] ) ? WFT_Downloads::sanitize_source( (string) $context['source'] ) : $source;
+        $context['download_id']    = isset( $context['download_id'] ) ? absint( $context['download_id'] ) : $download_id;
+        $context['file_name']      = isset( $context['file_name'] ) ? sanitize_text_field( (string) $context['file_name'] ) : $file_name;
+        $context['source']         = isset( $context['source'] ) ? WFT_Downloads::sanitize_source( (string) $context['source'] ) : $source;
+        $context['via_page_id']    = isset( $context['via_page_id'] ) ? absint( $context['via_page_id'] ) : $via_page_id;
+        $context['via_page_title'] = isset( $context['via_page_title'] ) ? sanitize_text_field( (string) $context['via_page_title'] ) : $via_page_title;
 
         if ( isset( $context['filename_parameter'] ) ) {
             $context['filename_parameter'] = self::sanitize_parameter_name( (string) $context['filename_parameter'] );
@@ -159,6 +199,14 @@ final class WFT_Analytics {
             ? self::sanitize_parameter_name( (string) $context['source_parameter'] )
             : $source_parameter;
 
+        $context['via_page_id_parameter'] = isset( $context['via_page_id_parameter'] )
+            ? self::sanitize_parameter_name( (string) $context['via_page_id_parameter'] )
+            : $via_page_id_parameter;
+
+        $context['via_page_title_parameter'] = isset( $context['via_page_title_parameter'] )
+            ? self::sanitize_parameter_name( (string) $context['via_page_title_parameter'] )
+            : $via_page_title_parameter;
+
         return $context;
     }
 
@@ -166,9 +214,9 @@ final class WFT_Analytics {
      * Backwards-compatible wrapper for code that called the old Analytics
      * handoff renderer directly.
      */
-    public static function render_download_handoff( $tracker, string $source ): void {
+    public static function render_download_handoff( $tracker, string $source, int $via_page_id = 0, string $via_page_title = '' ): void {
         if ( class_exists( 'WFT_Download_Page' ) ) {
-            WFT_Download_Page::render_handoff( $tracker, $source );
+            WFT_Download_Page::render_handoff( $tracker, $source, $via_page_id, $via_page_title );
         }
     }
 

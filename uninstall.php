@@ -40,8 +40,12 @@ function wft_uninstall_site_data(): void {
     delete_option( 'wft_ga_download_id_parameter' );
     delete_option( 'wft_ga_filename_parameter' );
     delete_option( 'wft_ga_source_parameter' );
+    delete_option( 'wft_ga_via_page_id_parameter' );
+    delete_option( 'wft_ga_via_page_title_parameter' );
     delete_option( 'wft_download_page_html' );
     delete_option( 'wft_download_page_css' );
+    delete_option( 'wft_download_page_logo_id' );
+    delete_option( 'wft_download_page_hide_site_name' );
     delete_option( 'wft_rewrite_version' );
     delete_option( 'wft_sdm_migration_rollback' );
     delete_option( 'wft_sdm_migration_last_run' );
@@ -74,8 +78,12 @@ if ( is_multisite() ) {
     delete_site_option( 'wft_ga_download_id_parameter' );
     delete_site_option( 'wft_ga_filename_parameter' );
     delete_site_option( 'wft_ga_source_parameter' );
+    delete_site_option( 'wft_ga_via_page_id_parameter' );
+    delete_site_option( 'wft_ga_via_page_title_parameter' );
     delete_site_option( 'wft_download_page_html' );
     delete_site_option( 'wft_download_page_css' );
+    delete_site_option( 'wft_download_page_logo_id' );
+    delete_site_option( 'wft_download_page_hide_site_name' );
     delete_site_option( 'wft_rewrite_version' );
     delete_site_option( 'wft_sdm_migration_rollback' );
     delete_site_option( 'wft_sdm_migration_last_run' );

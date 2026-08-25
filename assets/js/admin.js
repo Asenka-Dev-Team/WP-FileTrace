@@ -2,6 +2,7 @@
     'use strict';
 
     let mediaFrame = null;
+    let downloadPageLogoFrame = null;
 
     function getWrap() {
         return $('.wft-wrap').first();
@@ -361,6 +362,40 @@
             $('#wft-media-preview').prop('hidden', true);
             $('#wft-clear-media').prop('hidden', true);
         }
+    });
+
+    $(document).on('click', '#wft-select-download-page-logo', function (event) {
+        event.preventDefault();
+
+        if (downloadPageLogoFrame) {
+            downloadPageLogoFrame.open();
+            return;
+        }
+
+        downloadPageLogoFrame = wp.media({
+            title: 'Select download page logo or icon',
+            button: { text: 'Use this image' },
+            library: { type: 'image' },
+            multiple: false
+        });
+
+        downloadPageLogoFrame.on('select', function () {
+            const attachment = downloadPageLogoFrame.state().get('selection').first().toJSON();
+            $('#wft-download-page-logo-id').val(attachment.id || '');
+            $('#wft-download-page-logo-image').attr('src', attachment.url || '');
+            $('#wft-download-page-logo-preview').prop('hidden', !attachment.url);
+            $('#wft-clear-download-page-logo').prop('hidden', false);
+        });
+
+        downloadPageLogoFrame.open();
+    });
+
+    $(document).on('click', '#wft-clear-download-page-logo', function (event) {
+        event.preventDefault();
+        $('#wft-download-page-logo-id').val('');
+        $('#wft-download-page-logo-image').attr('src', '');
+        $('#wft-download-page-logo-preview').prop('hidden', true);
+        $(this).prop('hidden', true);
     });
 
     $(document).on('click', '#wft-generate', function () {

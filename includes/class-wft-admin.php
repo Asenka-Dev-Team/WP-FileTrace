@@ -342,16 +342,18 @@ final class WFT_Admin {
             $notice = 'event_cleared';
         } else {
             $global_snippet = isset( $_POST['wft_ga_global_snippet'] ) ? (string) wp_unslash( $_POST['wft_ga_global_snippet'] ) : '';
-            $event_snippet         = isset( $_POST['wft_ga_event_snippet'] ) ? (string) wp_unslash( $_POST['wft_ga_event_snippet'] ) : '';
-            $download_id_parameter = isset( $_POST['wft_ga_download_id_parameter'] ) ? sanitize_text_field( wp_unslash( $_POST['wft_ga_download_id_parameter'] ) ) : '';
-            $file_parameter        = isset( $_POST['wft_ga_filename_parameter'] ) ? sanitize_text_field( wp_unslash( $_POST['wft_ga_filename_parameter'] ) ) : '';
-            $source_parameter      = isset( $_POST['wft_ga_source_parameter'] ) ? sanitize_text_field( wp_unslash( $_POST['wft_ga_source_parameter'] ) ) : '';
+            $event_snippet            = isset( $_POST['wft_ga_event_snippet'] ) ? (string) wp_unslash( $_POST['wft_ga_event_snippet'] ) : '';
+            $download_id_parameter    = isset( $_POST['wft_ga_download_id_parameter'] ) ? sanitize_text_field( wp_unslash( $_POST['wft_ga_download_id_parameter'] ) ) : '';
+            $file_parameter           = isset( $_POST['wft_ga_filename_parameter'] ) ? sanitize_text_field( wp_unslash( $_POST['wft_ga_filename_parameter'] ) ) : '';
+            $source_parameter         = isset( $_POST['wft_ga_source_parameter'] ) ? sanitize_text_field( wp_unslash( $_POST['wft_ga_source_parameter'] ) ) : '';
+            $via_page_id_parameter    = isset( $_POST['wft_ga_via_page_id_parameter'] ) ? sanitize_text_field( wp_unslash( $_POST['wft_ga_via_page_id_parameter'] ) ) : '';
+            $via_page_title_parameter = isset( $_POST['wft_ga_via_page_title_parameter'] ) ? sanitize_text_field( wp_unslash( $_POST['wft_ga_via_page_title_parameter'] ) ) : '';
 
             if ( ( '' !== trim( $global_snippet ) || '' !== trim( $event_snippet ) ) && ! current_user_can( 'unfiltered_html' ) ) {
                 wp_send_json_error( array( 'message' => __( 'Your account is not allowed to save executable analytics snippets.', 'wp-filetrace' ) ), 403 );
             }
 
-            WFT_Analytics::save_settings( $global_snippet, $event_snippet, $download_id_parameter, $file_parameter, $source_parameter );
+            WFT_Analytics::save_settings( $global_snippet, $event_snippet, $download_id_parameter, $file_parameter, $source_parameter, $via_page_id_parameter, $via_page_title_parameter );
         }
 
         self::ajax_send_page(
@@ -378,9 +380,11 @@ final class WFT_Admin {
             WFT_Download_Page::clear_all();
             $notice = 'all_cleared';
         } else {
-            $html = isset( $_POST['wft_download_page_html'] ) ? (string) wp_unslash( $_POST['wft_download_page_html'] ) : '';
-            $css  = isset( $_POST['wft_download_page_css'] ) ? (string) wp_unslash( $_POST['wft_download_page_css'] ) : '';
-            WFT_Download_Page::save_settings( $html, $css );
+            $html           = isset( $_POST['wft_download_page_html'] ) ? (string) wp_unslash( $_POST['wft_download_page_html'] ) : '';
+            $css            = isset( $_POST['wft_download_page_css'] ) ? (string) wp_unslash( $_POST['wft_download_page_css'] ) : '';
+            $logo_id        = isset( $_POST['wft_download_page_logo_id'] ) ? absint( wp_unslash( $_POST['wft_download_page_logo_id'] ) ) : 0;
+            $hide_site_name = ! empty( $_POST['wft_download_page_hide_site_name'] );
+            WFT_Download_Page::save_settings( $html, $css, $logo_id, $hide_site_name );
         }
 
         self::ajax_send_page(
@@ -736,16 +740,18 @@ final class WFT_Admin {
             $notice = 'event_cleared';
         } else {
             $global_snippet = isset( $_POST['wft_ga_global_snippet'] ) ? (string) wp_unslash( $_POST['wft_ga_global_snippet'] ) : '';
-            $event_snippet         = isset( $_POST['wft_ga_event_snippet'] ) ? (string) wp_unslash( $_POST['wft_ga_event_snippet'] ) : '';
-            $download_id_parameter = isset( $_POST['wft_ga_download_id_parameter'] ) ? sanitize_text_field( wp_unslash( $_POST['wft_ga_download_id_parameter'] ) ) : '';
-            $file_parameter        = isset( $_POST['wft_ga_filename_parameter'] ) ? sanitize_text_field( wp_unslash( $_POST['wft_ga_filename_parameter'] ) ) : '';
-            $source_parameter      = isset( $_POST['wft_ga_source_parameter'] ) ? sanitize_text_field( wp_unslash( $_POST['wft_ga_source_parameter'] ) ) : '';
+            $event_snippet            = isset( $_POST['wft_ga_event_snippet'] ) ? (string) wp_unslash( $_POST['wft_ga_event_snippet'] ) : '';
+            $download_id_parameter    = isset( $_POST['wft_ga_download_id_parameter'] ) ? sanitize_text_field( wp_unslash( $_POST['wft_ga_download_id_parameter'] ) ) : '';
+            $file_parameter           = isset( $_POST['wft_ga_filename_parameter'] ) ? sanitize_text_field( wp_unslash( $_POST['wft_ga_filename_parameter'] ) ) : '';
+            $source_parameter         = isset( $_POST['wft_ga_source_parameter'] ) ? sanitize_text_field( wp_unslash( $_POST['wft_ga_source_parameter'] ) ) : '';
+            $via_page_id_parameter    = isset( $_POST['wft_ga_via_page_id_parameter'] ) ? sanitize_text_field( wp_unslash( $_POST['wft_ga_via_page_id_parameter'] ) ) : '';
+            $via_page_title_parameter = isset( $_POST['wft_ga_via_page_title_parameter'] ) ? sanitize_text_field( wp_unslash( $_POST['wft_ga_via_page_title_parameter'] ) ) : '';
 
             if ( ( '' !== trim( $global_snippet ) || '' !== trim( $event_snippet ) ) && ! current_user_can( 'unfiltered_html' ) ) {
                 wp_die( esc_html__( 'Your account is not allowed to save executable analytics snippets.', 'wp-filetrace' ) );
             }
 
-            WFT_Analytics::save_settings( $global_snippet, $event_snippet, $download_id_parameter, $file_parameter, $source_parameter );
+            WFT_Analytics::save_settings( $global_snippet, $event_snippet, $download_id_parameter, $file_parameter, $source_parameter, $via_page_id_parameter, $via_page_title_parameter );
         }
 
         wp_safe_redirect(
@@ -781,9 +787,11 @@ final class WFT_Admin {
             WFT_Download_Page::clear_all();
             $notice = 'all_cleared';
         } else {
-            $html = isset( $_POST['wft_download_page_html'] ) ? (string) wp_unslash( $_POST['wft_download_page_html'] ) : '';
-            $css  = isset( $_POST['wft_download_page_css'] ) ? (string) wp_unslash( $_POST['wft_download_page_css'] ) : '';
-            WFT_Download_Page::save_settings( $html, $css );
+            $html           = isset( $_POST['wft_download_page_html'] ) ? (string) wp_unslash( $_POST['wft_download_page_html'] ) : '';
+            $css            = isset( $_POST['wft_download_page_css'] ) ? (string) wp_unslash( $_POST['wft_download_page_css'] ) : '';
+            $logo_id        = isset( $_POST['wft_download_page_logo_id'] ) ? absint( wp_unslash( $_POST['wft_download_page_logo_id'] ) ) : 0;
+            $hide_site_name = ! empty( $_POST['wft_download_page_hide_site_name'] );
+            WFT_Download_Page::save_settings( $html, $css, $logo_id, $hide_site_name );
         }
 
         wp_safe_redirect(
@@ -972,8 +980,10 @@ final class WFT_Admin {
         $event_snippet         = WFT_Analytics::get_event_snippet();
         $download_id_parameter = WFT_Analytics::get_download_id_parameter();
         $file_parameter        = WFT_Analytics::get_filename_parameter();
-        $source_parameter      = WFT_Analytics::get_source_parameter();
-        $notice                = isset( $_GET['wft_analytics_notice'] ) ? sanitize_key( wp_unslash( $_GET['wft_analytics_notice'] ) ) : '';
+        $source_parameter         = WFT_Analytics::get_source_parameter();
+        $via_page_id_parameter    = WFT_Analytics::get_via_page_id_parameter();
+        $via_page_title_parameter = WFT_Analytics::get_via_page_title_parameter();
+        $notice                   = isset( $_GET['wft_analytics_notice'] ) ? sanitize_key( wp_unslash( $_GET['wft_analytics_notice'] ) ) : '';
         ?>
         <div class="wrap wft-wrap">
             <header class="wft-page-header">
@@ -1048,7 +1058,7 @@ final class WFT_Admin {
                             </span>
                         </div>
                         <label class="screen-reader-text" for="wft-ga-event-snippet"><?php esc_html_e( 'Download Event code', 'wp-filetrace' ); ?></label>
-                        <textarea id="wft-ga-event-snippet" class="wft-code-textarea" name="wft_ga_event_snippet" rows="10" spellcheck="false" placeholder="gtag('event', 'haver_download', {&#10;    'download_id': '&lt;&lt;INSERT ID HERE&gt;&gt;',&#10;    'download_name': '&lt;&lt;INSERT NAME HERE&gt;&gt;',&#10;    'download_source': '&lt;&lt;INSERT SOURCE HERE&gt;&gt;'&#10;});"><?php echo esc_textarea( $event_snippet ); ?></textarea>
+                        <textarea id="wft-ga-event-snippet" class="wft-code-textarea" name="wft_ga_event_snippet" rows="10" spellcheck="false" placeholder="gtag('event', 'haver_download', {&#10;    'download_id': '&lt;&lt;INSERT ID HERE&gt;&gt;',&#10;    'download_name': '&lt;&lt;INSERT NAME HERE&gt;&gt;',&#10;    'download_source': '&lt;&lt;INSERT SOURCE HERE&gt;&gt;',&#10;    'via_page_id': '&lt;&lt;INSERT PAGE ID HERE&gt;&gt;',&#10;    'via_page_title': '&lt;&lt;INSERT PAGE TITLE HERE&gt;&gt;'&#10;});"><?php echo esc_textarea( $event_snippet ); ?></textarea>
                         <p class="description"><?php esc_html_e( 'A surrounding <script> tag is optional for this field. WP FileTrace executes the event during a short browser handoff and then continues to the requested file.', 'wp-filetrace' ); ?></p>
                     </div>
 
@@ -1073,6 +1083,22 @@ final class WFT_Admin {
                         <input type="text" id="wft-ga-source-parameter" name="wft_ga_source_parameter" value="<?php echo esc_attr( $source_parameter ); ?>" placeholder="download_source">
                         <p class="description">
                             <?php esc_html_e( 'Optional. Enter the gtag event parameter that should receive what triggered the tracked download. WP FileTrace sends shortcode for [wft] button downloads and external for shareable/direct tracked links. Example: download_source.', 'wp-filetrace' ); ?>
+                        </p>
+                    </div>
+
+                    <div class="wft-analytics-section wft-analytics-parameter-section">
+                        <label for="wft-ga-via-page-id-parameter"><?php esc_html_e( 'Via Page ID Event Parameter', 'wp-filetrace' ); ?></label>
+                        <input type="text" id="wft-ga-via-page-id-parameter" name="wft_ga_via_page_id_parameter" value="<?php echo esc_attr( $via_page_id_parameter ); ?>" placeholder="via_page_id">
+                        <p class="description">
+                            <?php esc_html_e( 'Optional. When the tracked download is clicked from WordPress content, this parameter receives that post/page/CPT ID. Email or otherwise external clicks send 0. Example: via_page_id.', 'wp-filetrace' ); ?>
+                        </p>
+                    </div>
+
+                    <div class="wft-analytics-section wft-analytics-parameter-section">
+                        <label for="wft-ga-via-page-title-parameter"><?php esc_html_e( 'Via Page Title Event Parameter', 'wp-filetrace' ); ?></label>
+                        <input type="text" id="wft-ga-via-page-title-parameter" name="wft_ga_via_page_title_parameter" value="<?php echo esc_attr( $via_page_title_parameter ); ?>" placeholder="via_page_title">
+                        <p class="description">
+                            <?php esc_html_e( 'Optional. When an originating WordPress content ID is known, this parameter receives its current title. External clicks without page context send an empty value. Example: via_page_title.', 'wp-filetrace' ); ?>
                         </p>
                     </div>
 
@@ -1101,9 +1127,12 @@ final class WFT_Admin {
     }
 
     private static function render_download_page(): void {
-        $html   = WFT_Download_Page::get_html();
-        $css    = WFT_Download_Page::get_css();
-        $notice = isset( $_GET['wft_download_page_notice'] ) ? sanitize_key( wp_unslash( $_GET['wft_download_page_notice'] ) ) : '';
+        $html           = WFT_Download_Page::get_html();
+        $css            = WFT_Download_Page::get_css();
+        $logo_id        = WFT_Download_Page::get_logo_id();
+        $logo_url       = WFT_Download_Page::get_logo_url();
+        $hide_site_name = WFT_Download_Page::hide_site_name();
+        $notice         = isset( $_GET['wft_download_page_notice'] ) ? sanitize_key( wp_unslash( $_GET['wft_download_page_notice'] ) ) : '';
         ?>
         <div class="wrap wft-wrap">
             <header class="wft-page-header">
@@ -1162,6 +1191,32 @@ final class WFT_Admin {
                     <input type="hidden" name="action" value="wft_save_download_page">
                     <?php wp_nonce_field( 'wft_save_download_page' ); ?>
 
+                    <div class="wft-download-page-branding">
+                        <span class="wft-eyebrow"><?php esc_html_e( 'Built-in Page Branding', 'wp-filetrace' ); ?></span>
+                        <div class="wft-download-page-branding-grid">
+                            <div class="wft-download-page-logo-setting">
+                                <label><?php esc_html_e( 'Default Logo / Icon', 'wp-filetrace' ); ?></label>
+                                <p class="description"><?php esc_html_e( 'Optional. Select or upload an image from the WordPress Media Library. It appears at the top of the built-in download card. Custom HTML can access the same image with {{logo_url}}.', 'wp-filetrace' ); ?></p>
+                                <input type="hidden" id="wft-download-page-logo-id" name="wft_download_page_logo_id" value="<?php echo (int) $logo_id; ?>">
+                                <div id="wft-download-page-logo-preview" class="wft-download-page-logo-preview"<?php echo '' === $logo_url ? ' hidden' : ''; ?>>
+                                    <img id="wft-download-page-logo-image" src="<?php echo esc_url( $logo_url ); ?>" alt="">
+                                </div>
+                                <div class="wft-download-page-logo-actions">
+                                    <button type="button" class="button" id="wft-select-download-page-logo"><?php esc_html_e( 'Select Logo / Icon', 'wp-filetrace' ); ?></button>
+                                    <button type="button" class="button" id="wft-clear-download-page-logo"<?php echo '' === $logo_url ? ' hidden' : ''; ?>><?php esc_html_e( 'Clear Logo', 'wp-filetrace' ); ?></button>
+                                </div>
+                            </div>
+
+                            <div class="wft-download-page-site-name-setting">
+                                <label for="wft-download-page-hide-site-name" class="wft-beta-feature-toggle">
+                                    <input type="checkbox" id="wft-download-page-hide-site-name" name="wft_download_page_hide_site_name" value="1" <?php checked( $hide_site_name ); ?>>
+                                    <span><strong><?php esc_html_e( 'Hide default site-name text', 'wp-filetrace' ); ?></strong></span>
+                                </label>
+                                <p class="description"><?php esc_html_e( 'Hides the small WordPress site-name label from the built-in download card. This does not remove {{site_name}} from custom HTML templates.', 'wp-filetrace' ); ?></p>
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="wft-download-page-editor-grid">
                         <div class="wft-download-page-editor">
                             <label for="wft-download-page-html"><?php esc_html_e( 'Custom HTML', 'wp-filetrace' ); ?></label>
@@ -1183,7 +1238,11 @@ final class WFT_Admin {
                             <code>{{file_name}}</code><span><?php esc_html_e( 'Actual filename resolved from the destination URL.', 'wp-filetrace' ); ?></span>
                             <code>{{download_url}}</code><span><?php esc_html_e( 'No-track retry URL. Safe to use for a custom manual-download link.', 'wp-filetrace' ); ?></span>
                             <code>{{download_source}}</code><span><?php esc_html_e( 'shortcode or external.', 'wp-filetrace' ); ?></span>
+                            <code>{{via_page_id}}</code><span><?php esc_html_e( 'Originating WordPress content ID when known; otherwise 0.', 'wp-filetrace' ); ?></span>
+                            <code>{{via_page_title}}</code><span><?php esc_html_e( 'Originating WordPress content title when known.', 'wp-filetrace' ); ?></span>
                             <code>{{site_name}}</code><span><?php esc_html_e( 'Current WordPress site name.', 'wp-filetrace' ); ?></span>
+                            <code>{{site_url}}</code><span><?php esc_html_e( 'Main WordPress site URL.', 'wp-filetrace' ); ?></span>
+                            <code>{{logo_url}}</code><span><?php esc_html_e( 'URL of the logo/icon selected above, when configured.', 'wp-filetrace' ); ?></span>
                         </div>
                     </div>
 
