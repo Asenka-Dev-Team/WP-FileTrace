@@ -40,7 +40,7 @@ Primary Developer: **Brian McLendon** - [u/eyeofbri](https://github.com/eyeofbri
 - Customize the download handoff page with saved HTML/CSS, an optional default-page logo/icon, and an option to hide the built-in site-name label.
 - Preview the saved download page without incrementing counts, starting a file download, or firing analytics.
 - Use download-page template variables for tracker title, actual filename, no-track retry URL, download source, originating page data, site details, and the configured logo URL.
-- Provide a delayed manual-download fallback that does not increment counters or fire analytics a second time, followed by a standalone **Back to main site** link.
+- Provide a delayed manual-download fallback that does not increment counters or fire analytics a second time, followed by a contextual **Back to previous page** link when an originating WordPress page is known, or **Back to main site** for external/email downloads.
 - Fade/remove the built-in loading spinner shortly after the manual fallback becomes available.
 - Include a temporary 200-row synthetic test-data generator for pagination and sorting tests.
 - Check GitHub Releases for new WP FileTrace versions and surface updates through the normal WordPress plugin updater.
@@ -177,7 +177,7 @@ The Global Site Tag, Download Event, and all dynamic parameter mappings remain o
 
 ### Download Page
 
-The Download Page tab controls the lightweight frontend handoff shown after WP FileTrace successfully records a download. Leaving the custom HTML/CSS fields blank uses the built-in centered WP FileTrace layout with a minimal card, loading indicator, automatic file start, delayed manual-download fallback, and a small **Back to main site** button below the handoff containers.
+The Download Page tab controls the lightweight frontend handoff shown after WP FileTrace successfully records a download. Leaving the custom HTML/CSS fields blank uses the built-in centered WP FileTrace layout with a minimal card, loading indicator, automatic file start, delayed manual-download fallback, and a small contextual return button below the handoff containers. It shows **Back to previous page** when an originating WordPress page is known, otherwise **Back to main site**.
 
 The built-in page can optionally show a logo/icon selected or uploaded through the WordPress Media Library. The small default WordPress site-name label can also be hidden independently. The loading spinner fades away shortly after the delayed fallback message appears.
 
@@ -191,13 +191,15 @@ Available HTML variables include:
 - `{{download_source}}` — `shortcode` or `external`.
 - `{{via_page_id}}` — originating WordPress content ID when known, otherwise `0`.
 - `{{via_page_title}}` — originating WordPress content title when known.
+- `{{via_page_url}}` — originating WordPress content permalink when known.
+- `{{return_url}}` — originating page URL when known, otherwise the main site URL.
 - `{{site_name}}` — current WordPress site name.
 - `{{site_url}}` — WordPress home/root URL.
 - `{{logo_url}}` — URL for the selected Download Page logo/icon when configured.
 
 **Preview Saved Page** opens an administrator-only preview using sample values. Preview mode does not increment a tracker, start a file download, or run the configured custom `gtag` event.
 
-The automatic download and delayed retry button use a dedicated retry route after the original request has already been counted. Retry requests do not increment WP FileTrace counters, create another event-history row, or fire the configured download analytics event again. The **Back to main site** button links directly to the WordPress home URL and is never part of the tracking flow.
+The automatic download and delayed retry button use a dedicated retry route after the original request has already been counted. Retry requests do not increment WP FileTrace counters, create another event-history row, or fire the configured download analytics event again. The return button links back to the originating WordPress page when page context is known; otherwise it links to the WordPress home URL. It is never part of the tracking flow.
 
 ### Settings
 
@@ -274,7 +276,7 @@ Release workflow:
 
 1. Update the plugin version and `changelog.md`.
 2. Commit and push the version to GitHub.
-3. Create a GitHub Release with a matching version tag such as `v0.1.12`.
+3. Create a GitHub Release with a matching version tag such as `v0.1.13`.
 4. Publish the release as a normal release, not a draft or prerelease.
 
 Beginning with v0.1.5, no manually uploaded release ZIP is required. The updater uses GitHub's automatically generated release source ZIP and normalizes its extracted repository directory back to `wp-filetrace/` during the WordPress upgrade process.

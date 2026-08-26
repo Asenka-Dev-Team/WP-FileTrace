@@ -12,6 +12,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) 
 
 ### Fixed
 
+## [0.1.13] - 2026-08-26
+
+### Added
+
+- Added originating-page permalink context to the download handoff so tracked links clicked from WordPress content can return visitors to that page.
+- Added `{{via_page_url}}` and `{{return_url}}` Download Page template variables.
+- Added reusable **OPTIONAL** badges to Analytics parameter mappings.
+- Added a reusable icon-button alignment class for consistent Dashicon positioning across admin controls.
+
+### Changed
+
+- Bumped WP FileTrace to v0.1.13.
+- Changed the download-page return control to **Back to previous page** when a shortcode or same-site tracked link supplies originating-page context; external/email downloads continue to show **Back to main site**.
+- Moved the word Optional out of Analytics parameter descriptions and into visually distinct section labels.
+- Changed the **DEV** badge to a distinct slate treatment so it is visually separate from yellow **BETA** badges.
+- Updated GitHub Releases, Preview, Update Check, migration, and tracked-file icon buttons to use consistent Dashicon vertical alignment.
+
+### Fixed
+
+- Fixed inconsistent Dashicon line-height/vertical positioning in several admin buttons.
+
 ## [0.1.12] - 2026-08-25
 
 ### Added

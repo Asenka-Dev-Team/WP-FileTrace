@@ -168,21 +168,35 @@ final class WFT_Download_Page {
             ? sanitize_text_field( (string) $tracker->title )
             : self::file_name( $tracker );
 
-        $retry_url     = $preview ? '#' : self::retry_url( $tracker );
-        $via_page_id   = absint( $via_page_id );
+        $retry_url      = $preview ? '#' : self::retry_url( $tracker );
+        $via_page_id    = absint( $via_page_id );
         $via_page_title = sanitize_text_field( $via_page_title );
+        $via_page_url   = '';
 
-        if ( $via_page_id > 0 && '' === $via_page_title ) {
+        if ( $via_page_id > 0 ) {
             $via_post = get_post( $via_page_id );
-            if ( $via_post && is_post_publicly_viewable( $via_post ) ) {
-                $resolved_title = get_the_title( $via_page_id );
-                if ( is_string( $resolved_title ) ) {
-                    $via_page_title = sanitize_text_field( $resolved_title );
-                }
+            if ( $preview ) {
+                $via_page_url = home_url( '/charts-reports/' );
+            } elseif ( ! $via_post || ! is_post_publicly_viewable( $via_post ) ) {
+                $via_page_id    = 0;
+                $via_page_title = '';
             } else {
-                $via_page_id = 0;
+                if ( '' === $via_page_title ) {
+                    $resolved_title = get_the_title( $via_page_id );
+                    if ( is_string( $resolved_title ) ) {
+                        $via_page_title = sanitize_text_field( $resolved_title );
+                    }
+                }
+
+                $resolved_url = get_permalink( $via_page_id );
+                if ( is_string( $resolved_url ) && '' !== $resolved_url ) {
+                    $via_page_url = esc_url_raw( $resolved_url );
+                }
             }
         }
+
+        $site_url   = esc_url_raw( home_url( '/' ) );
+        $return_url = '' !== $via_page_url ? $via_page_url : $site_url;
 
         return array(
             'download_id'     => isset( $tracker->id ) ? absint( $tracker->id ) : 0,
@@ -192,8 +206,10 @@ final class WFT_Download_Page {
             'download_source' => WFT_Downloads::sanitize_source( $source ),
             'via_page_id'     => $via_page_id,
             'via_page_title'  => $via_page_title,
+            'via_page_url'    => $via_page_url,
             'site_name'       => sanitize_text_field( (string) get_bloginfo( 'name' ) ),
-            'site_url'        => esc_url_raw( home_url( '/' ) ),
+            'site_url'        => $site_url,
+            'return_url'      => $return_url,
             'logo_url'        => self::get_logo_url(),
             'hide_site_name'  => self::hide_site_name(),
             'preview'         => $preview,
@@ -216,9 +232,11 @@ final class WFT_Download_Page {
             );
         $event_javascript = $preview ? '' : WFT_Analytics::event_javascript();
 
-        $retry_url = (string) $context['download_url'];
-        $site_url  = (string) $context['site_url'];
-        $title     = sprintf(
+        $retry_url   = (string) $context['download_url'];
+        $return_url  = (string) $context['return_url'];
+        $has_origin  = '' !== (string) $context['via_page_url'];
+        $return_text = $has_origin ? __( 'Back to previous page', 'wp-filetrace' ) : __( 'Back to main site', 'wp-filetrace' );
+        $title       = sprintf(
             /* translators: %s: download title. */
             __( 'Preparing %s download', 'wp-filetrace' ),
             (string) $context['download_name']
@@ -278,7 +296,7 @@ final class WFT_Download_Page {
             </noscript>
 
             <div class="wft-download-main-site">
-                <a href="<?php echo esc_url( $site_url ); ?>"><?php esc_html_e( 'Back to main site', 'wp-filetrace' ); ?></a>
+                <a href="<?php echo esc_url( $return_url ); ?>"><?php echo esc_html( $return_text ); ?></a>
             </div>
         </div>
     </main>
@@ -427,6 +445,8 @@ final class WFT_Download_Page {
             '{{download_source}}' => esc_html( (string) $context['download_source'] ),
             '{{via_page_id}}'     => esc_html( (string) $context['via_page_id'] ),
             '{{via_page_title}}'  => esc_html( (string) $context['via_page_title'] ),
+            '{{via_page_url}}'    => esc_url( (string) $context['via_page_url'] ),
+            '{{return_url}}'      => esc_url( (string) $context['return_url'] ),
             '{{site_name}}'       => esc_html( (string) $context['site_name'] ),
             '{{site_url}}'        => esc_url( (string) $context['site_url'] ),
             '{{logo_url}}'        => esc_url( (string) $context['logo_url'] ),
@@ -505,6 +525,8 @@ final class WFT_Download_Page {
         // wp_kses_post can validate href/src attributes safely.
         $placeholders = array(
             '{{download_url}}' => 'https://wft-preview.invalid/retry',
+            '{{via_page_url}}' => 'https://wft-preview.invalid/source-page/',
+            '{{return_url}}'   => 'https://wft-preview.invalid/source-page/',
             '{{site_url}}'     => 'https://wft-preview.invalid/',
             '{{logo_url}}'     => 'https://wft-preview.invalid/logo.png',
         );

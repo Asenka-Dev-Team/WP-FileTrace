@@ -1063,42 +1063,42 @@ final class WFT_Admin {
                     </div>
 
                     <div class="wft-analytics-section wft-analytics-parameter-section">
-                        <label for="wft-ga-download-id-parameter"><?php esc_html_e( 'Download ID Event Parameter', 'wp-filetrace' ); ?></label>
+                        <label class="wft-analytics-parameter-label" for="wft-ga-download-id-parameter"><span class="wft-optional-badge"><?php esc_html_e( 'OPTIONAL', 'wp-filetrace' ); ?></span><span><?php esc_html_e( 'Download ID Event Parameter', 'wp-filetrace' ); ?></span></label>
                         <input type="text" id="wft-ga-download-id-parameter" name="wft_ga_download_id_parameter" value="<?php echo esc_attr( $download_id_parameter ); ?>" placeholder="download_id">
                         <p class="description">
-                            <?php esc_html_e( 'Optional. Enter the gtag event parameter that should receive the stable WP FileTrace tracker ID. If your event snippet already sets that parameter, WP FileTrace overwrites its value for the download event. Example: download_id.', 'wp-filetrace' ); ?>
+                            <?php esc_html_e( 'Enter the gtag event parameter that should receive the stable WP FileTrace tracker ID. If your event snippet already sets that parameter, WP FileTrace overwrites its value for the download event. Example: download_id.', 'wp-filetrace' ); ?>
                         </p>
                     </div>
 
                     <div class="wft-analytics-section wft-analytics-parameter-section">
-                        <label for="wft-ga-filename-parameter"><?php esc_html_e( 'File Name Event Parameter', 'wp-filetrace' ); ?></label>
+                        <label class="wft-analytics-parameter-label" for="wft-ga-filename-parameter"><span class="wft-optional-badge"><?php esc_html_e( 'OPTIONAL', 'wp-filetrace' ); ?></span><span><?php esc_html_e( 'File Name Event Parameter', 'wp-filetrace' ); ?></span></label>
                         <input type="text" id="wft-ga-filename-parameter" name="wft_ga_filename_parameter" value="<?php echo esc_attr( $file_parameter ); ?>" placeholder="file_name">
                         <p class="description">
-                            <?php esc_html_e( 'Optional. Enter the gtag event parameter that should receive the actual downloaded file name. If your event snippet already sets that parameter, WP FileTrace overwrites its value for the download event. Examples: download_name, file_name, or value.', 'wp-filetrace' ); ?>
+                            <?php esc_html_e( 'Enter the gtag event parameter that should receive the actual downloaded file name. If your event snippet already sets that parameter, WP FileTrace overwrites its value for the download event. Examples: download_name, file_name, or value.', 'wp-filetrace' ); ?>
                         </p>
                     </div>
 
                     <div class="wft-analytics-section wft-analytics-parameter-section">
-                        <label for="wft-ga-source-parameter"><?php esc_html_e( 'Download Source Event Parameter', 'wp-filetrace' ); ?></label>
+                        <label class="wft-analytics-parameter-label" for="wft-ga-source-parameter"><span class="wft-optional-badge"><?php esc_html_e( 'OPTIONAL', 'wp-filetrace' ); ?></span><span><?php esc_html_e( 'Download Source Event Parameter', 'wp-filetrace' ); ?></span></label>
                         <input type="text" id="wft-ga-source-parameter" name="wft_ga_source_parameter" value="<?php echo esc_attr( $source_parameter ); ?>" placeholder="download_source">
                         <p class="description">
-                            <?php esc_html_e( 'Optional. Enter the gtag event parameter that should receive what triggered the tracked download. WP FileTrace sends shortcode for [wft] button downloads and external for shareable/direct tracked links. Example: download_source.', 'wp-filetrace' ); ?>
+                            <?php esc_html_e( 'Enter the gtag event parameter that should receive what triggered the tracked download. WP FileTrace sends shortcode for [wft] button downloads and external for shareable/direct tracked links. Example: download_source.', 'wp-filetrace' ); ?>
                         </p>
                     </div>
 
                     <div class="wft-analytics-section wft-analytics-parameter-section">
-                        <label for="wft-ga-via-page-id-parameter"><?php esc_html_e( 'Via Page ID Event Parameter', 'wp-filetrace' ); ?></label>
+                        <label class="wft-analytics-parameter-label" for="wft-ga-via-page-id-parameter"><span class="wft-optional-badge"><?php esc_html_e( 'OPTIONAL', 'wp-filetrace' ); ?></span><span><?php esc_html_e( 'Via Page ID Event Parameter', 'wp-filetrace' ); ?></span></label>
                         <input type="text" id="wft-ga-via-page-id-parameter" name="wft_ga_via_page_id_parameter" value="<?php echo esc_attr( $via_page_id_parameter ); ?>" placeholder="via_page_id">
                         <p class="description">
-                            <?php esc_html_e( 'Optional. When the tracked download is clicked from WordPress content, this parameter receives that post/page/CPT ID. Email or otherwise external clicks send 0. Example: via_page_id.', 'wp-filetrace' ); ?>
+                            <?php esc_html_e( 'When the tracked download is clicked from WordPress content, this parameter receives that post/page/CPT ID. Email or otherwise external clicks send 0. Example: via_page_id.', 'wp-filetrace' ); ?>
                         </p>
                     </div>
 
                     <div class="wft-analytics-section wft-analytics-parameter-section">
-                        <label for="wft-ga-via-page-title-parameter"><?php esc_html_e( 'Via Page Title Event Parameter', 'wp-filetrace' ); ?></label>
+                        <label class="wft-analytics-parameter-label" for="wft-ga-via-page-title-parameter"><span class="wft-optional-badge"><?php esc_html_e( 'OPTIONAL', 'wp-filetrace' ); ?></span><span><?php esc_html_e( 'Via Page Title Event Parameter', 'wp-filetrace' ); ?></span></label>
                         <input type="text" id="wft-ga-via-page-title-parameter" name="wft_ga_via_page_title_parameter" value="<?php echo esc_attr( $via_page_title_parameter ); ?>" placeholder="via_page_title">
                         <p class="description">
-                            <?php esc_html_e( 'Optional. When an originating WordPress content ID is known, this parameter receives its current title. External clicks without page context send an empty value. Example: via_page_title.', 'wp-filetrace' ); ?>
+                            <?php esc_html_e( 'When an originating WordPress content ID is known, this parameter receives its current title. External clicks without page context send an empty value. Example: via_page_title.', 'wp-filetrace' ); ?>
                         </p>
                     </div>
 
@@ -1172,7 +1172,7 @@ final class WFT_Admin {
                         <span class="wft-eyebrow"><?php esc_html_e( 'Frontend Handoff', 'wp-filetrace' ); ?></span>
                         <h2><?php esc_html_e( 'Download Page', 'wp-filetrace' ); ?></h2>
                     </div>
-                    <a class="button wft-preview-button" href="<?php echo esc_url( WFT_Download_Page::preview_url() ); ?>" target="_blank" rel="noopener noreferrer">
+                    <a class="button wft-preview-button wft-button-with-icon" href="<?php echo esc_url( WFT_Download_Page::preview_url() ); ?>" target="_blank" rel="noopener noreferrer">
                         <span class="dashicons dashicons-visibility" aria-hidden="true"></span>
                         <?php esc_html_e( 'Preview Saved Page', 'wp-filetrace' ); ?>
                     </a>
@@ -1240,6 +1240,8 @@ final class WFT_Admin {
                             <code>{{download_source}}</code><span><?php esc_html_e( 'shortcode or external.', 'wp-filetrace' ); ?></span>
                             <code>{{via_page_id}}</code><span><?php esc_html_e( 'Originating WordPress content ID when known; otherwise 0.', 'wp-filetrace' ); ?></span>
                             <code>{{via_page_title}}</code><span><?php esc_html_e( 'Originating WordPress content title when known.', 'wp-filetrace' ); ?></span>
+                            <code>{{via_page_url}}</code><span><?php esc_html_e( 'Originating WordPress content permalink when known; otherwise blank.', 'wp-filetrace' ); ?></span>
+                            <code>{{return_url}}</code><span><?php esc_html_e( 'Originating page URL when known, otherwise the main site URL.', 'wp-filetrace' ); ?></span>
                             <code>{{site_name}}</code><span><?php esc_html_e( 'Current WordPress site name.', 'wp-filetrace' ); ?></span>
                             <code>{{site_url}}</code><span><?php esc_html_e( 'Main WordPress site URL.', 'wp-filetrace' ); ?></span>
                             <code>{{logo_url}}</code><span><?php esc_html_e( 'URL of the logo/icon selected above, when configured.', 'wp-filetrace' ); ?></span>
@@ -1344,12 +1346,12 @@ final class WFT_Admin {
                 <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="wft-update-check-form">
                     <input type="hidden" name="action" value="wft_check_updates">
                     <?php wp_nonce_field( 'wft_check_updates' ); ?>
-                    <button type="submit" class="button button-primary">
+                    <button type="submit" class="button button-primary wft-button-with-icon">
                         <span class="dashicons dashicons-update" aria-hidden="true"></span>
                         <?php esc_html_e( 'Check for Updates', 'wp-filetrace' ); ?>
                     </button>
                 </form>
-                <a class="button" href="<?php echo esc_url( WFT_Updater::releases_url() ); ?>" target="_blank" rel="noopener noreferrer"><?php esc_html_e( 'View GitHub Releases', 'wp-filetrace' ); ?> ↗</a>
+                <a class="button wft-button-with-icon" href="<?php echo esc_url( WFT_Updater::releases_url() ); ?>" target="_blank" rel="noopener noreferrer"><span class="dashicons dashicons-external" aria-hidden="true"></span><?php esc_html_e( 'View GitHub Releases', 'wp-filetrace' ); ?></a>
             </div>
 
             <p class="description wft-update-cache-note">
@@ -1496,7 +1498,7 @@ final class WFT_Admin {
                             <input type="checkbox" id="wft-enable-test-rows" name="wft_enable_test_rows" value="1" <?php checked( $test_rows_enabled ); ?>>
                             <span>
                                 <strong><?php esc_html_e( 'Enable Test Row Generator', 'wp-filetrace' ); ?></strong>
-                                <span class="wft-beta-badge">DEV</span>
+                                <span class="wft-dev-badge">DEV</span>
                             </span>
                         </label>
                         <p class="description"><?php esc_html_e( 'Shows the Generate 200 Test Rows button on the Tracked Files tab for testing sorting, pagination, and bulk actions. Leave this disabled on normal production sites.', 'wp-filetrace' ); ?></p>
@@ -1616,7 +1618,7 @@ final class WFT_Admin {
                     <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="wft-sdm-scan-form">
                         <input type="hidden" name="action" value="wft_sdm_scan">
                         <?php wp_nonce_field( 'wft_sdm_scan' ); ?>
-                        <button type="submit" class="button button-primary">
+                        <button type="submit" class="button button-primary wft-button-with-icon">
                             <span class="dashicons dashicons-search" aria-hidden="true"></span>
                             <?php esc_html_e( 'Scan Site / Dry Run', 'wp-filetrace' ); ?>
                         </button>
@@ -1626,7 +1628,7 @@ final class WFT_Admin {
                         <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="wft-sdm-apply-form">
                             <input type="hidden" name="action" value="wft_sdm_apply">
                             <?php wp_nonce_field( 'wft_sdm_apply' ); ?>
-                            <button type="submit" class="button button-secondary">
+                            <button type="submit" class="button button-secondary wft-button-with-icon">
                                 <span class="dashicons dashicons-migrate" aria-hidden="true"></span>
                                 <?php echo esc_html( sprintf( __( 'Apply %d Safe Replacement(s)', 'wp-filetrace' ), (int) $scan['ready'] ) ); ?>
                             </button>
@@ -2213,11 +2215,11 @@ final class WFT_Admin {
                                     <td><?php echo esc_html( $last ); ?></td>
                                     <td>
                                         <div class="wft-row-actions">
-                                            <button type="button" class="button button-small wft-copy-value wft-icon-text-button" data-copy="<?php echo esc_attr( $shortcode ); ?>">
+                                            <button type="button" class="button button-small wft-copy-value wft-icon-text-button wft-button-with-icon" data-copy="<?php echo esc_attr( $shortcode ); ?>">
                                                 <span class="dashicons dashicons-shortcode" aria-hidden="true"></span>
                                                 <span><?php esc_html_e( 'Copy Shortcode', 'wp-filetrace' ); ?></span>
                                             </button>
-                                            <button type="button" class="button button-small wft-copy-value wft-icon-text-button" data-copy="<?php echo esc_attr( $external ); ?>">
+                                            <button type="button" class="button button-small wft-copy-value wft-icon-text-button wft-button-with-icon" data-copy="<?php echo esc_attr( $external ); ?>">
                                                 <span class="dashicons dashicons-admin-links" aria-hidden="true"></span>
                                                 <span><?php esc_html_e( 'Copy Link', 'wp-filetrace' ); ?></span>
                                             </button>
