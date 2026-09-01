@@ -3,7 +3,7 @@
  * Plugin Name: WP FileTrace
  * Plugin URI: https://asenka.com/
  * Description: Track WordPress media and external file downloads through shortcodes and shareable tracked links.
- * Version: 0.1.13
+ * Version: 0.1.14
  * Author: Asenka Interactive
  * Author URI: https://asenka.com/
  * Text Domain: wp-filetrace
@@ -17,7 +17,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-define( 'WFT_VERSION', '0.1.13' );
+define( 'WFT_VERSION', '0.1.14' );
 define( 'WFT_FILE', __FILE__ );
 define( 'WFT_PATH', plugin_dir_path( __FILE__ ) );
 define( 'WFT_URL', plugin_dir_url( __FILE__ ) );
@@ -35,14 +35,14 @@ define( 'WFT_ENABLE_SDM_MIGRATION_DEFAULT', false );
 define( 'WFT_ENABLE_TEST_ROWS_DEFAULT', false );
 
 function wft_sdm_migration_enabled(): bool {
-    $saved = get_option( 'wft_enable_sdm_migration', WFT_ENABLE_SDM_MIGRATION_DEFAULT ? '1' : '0' );
+    $saved   = get_option( 'wft_enable_sdm_migration', WFT_ENABLE_SDM_MIGRATION_DEFAULT ? '1' : '0' );
     $enabled = in_array( $saved, array( true, 1, '1', 'yes', 'on' ), true );
 
     return (bool) apply_filters( 'wft_enable_migration', $enabled );
 }
 
 function wft_test_rows_enabled(): bool {
-    $saved = get_option( 'wft_enable_test_rows', WFT_ENABLE_TEST_ROWS_DEFAULT ? '1' : '0' );
+    $saved   = get_option( 'wft_enable_test_rows', WFT_ENABLE_TEST_ROWS_DEFAULT ? '1' : '0' );
     $enabled = in_array( $saved, array( true, 1, '1', 'yes', 'on' ), true );
 
     return (bool) apply_filters( 'wft_enable_test_rows', $enabled );
@@ -70,6 +70,7 @@ final class WP_FileTrace {
         if ( null === self::$instance ) {
             self::$instance = new self();
         }
+
         return self::$instance;
     }
 
@@ -102,6 +103,13 @@ final class WP_FileTrace {
 
 register_activation_hook( __FILE__, array( 'WP_FileTrace', 'activate' ) );
 register_deactivation_hook( __FILE__, array( 'WP_FileTrace', 'deactivate' ) );
+
+/**
+ * Handle WP FileTrace handoff/track routes before WordPress runs normal init,
+ * theme setup, shortcode registration, and frontend enqueue hooks. This keeps
+ * burst traffic on tracked links as small as WordPress plugin routing allows.
+ */
+add_action( 'plugins_loaded', array( 'WFT_Router', 'maybe_handle_early_request' ), 0 );
 
 add_action( 'plugins_loaded', static function (): void {
     WP_FileTrace::instance();

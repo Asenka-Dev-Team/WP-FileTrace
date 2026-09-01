@@ -2,6 +2,10 @@
 /**
  * Frontend download handoff page and preview tools for WP FileTrace.
  *
+ * v0.1.14 keeps the handoff standalone (no wp_head/wp_footer), defers tracking
+ * until browser JavaScript confirms the visit, and redirects directly to the
+ * destination file after confirmation.
+ *
  * Primary Developer: Brian McLendon
  */
 
@@ -15,7 +19,8 @@ final class WFT_Download_Page {
     public const OPTION_LOGO_ID        = 'wft_download_page_logo_id';
     public const OPTION_HIDE_SITE_NAME = 'wft_download_page_hide_site_name';
 
-    private const AUTO_START_DELAY_MS = 700;
+    private const TRACK_CONFIRM_DELAY_MS = 500;
+    private const AUTO_START_DELAY_MS    = 800;
     private const RETRY_REVEAL_MS     = 2200;
     private const SPINNER_HIDE_MS     = 2750;
 
@@ -86,8 +91,9 @@ final class WFT_Download_Page {
     }
 
     /**
-     * Retry URL used after the tracked request has already been recorded.
-     * This endpoint never increments counters or fires analytics again.
+     * Legacy no-track retry URL. Retained so old cached/custom handoff markup
+     * continues to work after the v0.1.14 flow begins redirecting directly to
+     * the destination file.
      */
     public static function retry_url( $tracker ): string {
         $key = isset( $tracker->public_key ) ? (string) $tracker->public_key : '';
@@ -109,7 +115,51 @@ final class WFT_Download_Page {
     }
 
     /**
-     * Render the tracked download handoff page.
+     * Browser-confirmation endpoint. Only a POST to this endpoint increments
+     * WP FileTrace counters in v0.1.14+.
+     */
+    public static function track_url( $tracker ): string {
+        $key = isset( $tracker->public_key ) ? (string) $tracker->public_key : '';
+        if ( '' === $key ) {
+            return '';
+        }
+
+        // Always use the query-string form here. The initial handoff exits at
+        // plugins_loaded before rewrite-rule refreshes can run, so this route
+        // must work immediately after an update without depending on a flush.
+        return add_query_arg(
+            array(
+                'wft_download_key'   => $key,
+                'wft_download_track' => '1',
+            ),
+            home_url( '/' )
+        );
+    }
+
+    /**
+     * Stable HMAC token embedded in the handoff page. It prevents blind POSTs
+     * to the confirmation route without introducing expiring WordPress nonces
+     * that would make the public handoff difficult to cache safely.
+     */
+    public static function track_token( $tracker ): string {
+        $key = isset( $tracker->public_key ) ? (string) $tracker->public_key : '';
+        if ( '' === $key ) {
+            return '';
+        }
+
+        return hash_hmac( 'sha256', 'wft-browser-track|' . $key, wp_salt( 'auth' ) );
+    }
+
+    public static function validate_track_token( $tracker, string $token ): bool {
+        $expected = self::track_token( $tracker );
+        return '' !== $expected && '' !== $token && hash_equals( $expected, $token );
+    }
+
+    /**
+     * Render the untracked initial handoff page.
+     *
+     * The initial GET is intentionally read-only. A real browser confirms the
+     * download via POST after this page executes JavaScript.
      *
      * @param object $tracker        Tracker database row.
      * @param string $source         shortcode|external.
@@ -121,9 +171,7 @@ final class WFT_Download_Page {
         $context = self::context_for_tracker( $tracker, $source, false, $via_page_id, $via_page_title );
 
         status_header( 200 );
-        nocache_headers();
-        header( 'X-Robots-Tag: noindex, nofollow, noarchive', true );
-
+        self::send_public_handoff_headers();
         self::render_document( $context, false );
     }
 
@@ -169,12 +217,16 @@ final class WFT_Download_Page {
             : self::file_name( $tracker );
 
         $retry_url      = $preview ? '#' : self::retry_url( $tracker );
+        $track_url      = $preview ? '#' : self::track_url( $tracker );
+        $track_token    = $preview ? '' : self::track_token( $tracker );
+        $file_url       = esc_url_raw( (string) ( $tracker->file_url ?? '' ) );
         $via_page_id    = absint( $via_page_id );
         $via_page_title = sanitize_text_field( $via_page_title );
         $via_page_url   = '';
 
         if ( $via_page_id > 0 ) {
             $via_post = get_post( $via_page_id );
+
             if ( $preview ) {
                 $via_page_url = home_url( '/charts-reports/' );
             } elseif ( ! $via_post || ! is_post_publicly_viewable( $via_post ) ) {
@@ -202,7 +254,11 @@ final class WFT_Download_Page {
             'download_id'     => isset( $tracker->id ) ? absint( $tracker->id ) : 0,
             'download_name'   => $title,
             'file_name'       => self::file_name( $tracker ),
+            // Kept as the legacy no-track retry route for custom-template compatibility.
             'download_url'    => $retry_url,
+            'file_url'        => $file_url,
+            'track_url'       => $track_url,
+            'track_token'     => $track_token,
             'download_source' => WFT_Downloads::sanitize_source( $source ),
             'via_page_id'     => $via_page_id,
             'via_page_title'  => $via_page_title,
@@ -220,7 +276,9 @@ final class WFT_Download_Page {
     private static function render_document( array $context, bool $preview ): void {
         $custom_html = trim( self::get_html() );
         $custom_css  = trim( self::get_css() );
-        $page_html   = '' !== $custom_html ? self::replace_tokens( $custom_html, $context ) : self::default_markup( $context );
+        $page_html   = '' !== $custom_html
+            ? self::replace_tokens( $custom_html, $context )
+            : self::default_markup( $context );
 
         $analytics = $preview
             ? array()
@@ -230,13 +288,15 @@ final class WFT_Download_Page {
                 (int) $context['via_page_id'],
                 (string) $context['via_page_title']
             );
-        $event_javascript = $preview ? '' : WFT_Analytics::event_javascript();
 
-        $retry_url   = (string) $context['download_url'];
-        $return_url  = (string) $context['return_url'];
-        $has_origin  = '' !== (string) $context['via_page_url'];
-        $return_text = $has_origin ? __( 'Back to previous page', 'wp-filetrace' ) : __( 'Back to main site', 'wp-filetrace' );
-        $title       = sprintf(
+        $event_javascript = $preview ? '' : WFT_Analytics::event_javascript();
+        $manual_url       = (string) $context['file_url'];
+        $track_url        = (string) $context['track_url'];
+        $track_token      = (string) $context['track_token'];
+        $return_url       = (string) $context['return_url'];
+        $has_origin       = '' !== (string) $context['via_page_url'];
+        $return_text      = $has_origin ? __( 'Back to previous page', 'wp-filetrace' ) : __( 'Back to main site', 'wp-filetrace' );
+        $title            = sprintf(
             /* translators: %s: download title. */
             __( 'Preparing %s download', 'wp-filetrace' ),
             (string) $context['download_name']
@@ -249,31 +309,34 @@ final class WFT_Download_Page {
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="robots" content="noindex,nofollow,noarchive">
     <title><?php echo esc_html( $title ); ?></title>
-    <?php if ( ! $preview ) : ?>
-        <?php wp_head(); ?>
-        <noscript><meta http-equiv="refresh" content="0;url=<?php echo esc_attr( $retry_url ); ?>"></noscript>
-    <?php endif; ?>
+<?php
+        // Intentionally output only WP FileTrace's configured analytics snippet.
+        // wp_head() is not called on this handoff page because doing so loads the
+        // site's theme/plugin frontend stack under burst traffic.
+        if ( ! $preview ) {
+            WFT_Analytics::output_global_snippet();
+        }
+?>
     <style id="wft-download-page-base-css">
 <?php echo self::base_css(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- plugin-owned CSS. ?>
     </style>
-    <?php if ( '' !== $custom_css ) : ?>
-        <style id="wft-download-page-custom-css">
+<?php if ( '' !== $custom_css ) : ?>
+    <style id="wft-download-page-custom-css">
 <?php echo $custom_css; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- sanitized administrator CSS. ?>
-        </style>
-    <?php endif; ?>
+    </style>
+<?php endif; ?>
 </head>
 <body class="wft-download-page-body<?php echo $preview ? ' is-preview' : ''; ?>">
-    <?php if ( $preview ) : ?>
-        <div class="wft-download-preview-badge" role="status"><?php esc_html_e( 'Preview Mode — no download or analytics event will run', 'wp-filetrace' ); ?></div>
-    <?php endif; ?>
-
+<?php if ( $preview ) : ?>
+    <div class="wft-download-preview-badge" role="status"><?php esc_html_e( 'Preview Mode — no download or analytics event will run', 'wp-filetrace' ); ?></div>
+<?php endif; ?>
     <main class="wft-download-page" aria-live="polite">
         <div class="wft-download-page-content">
             <?php echo $page_html; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- sanitized template with escaped runtime tokens. ?>
 
             <div class="wft-download-retry" id="wft-download-retry" hidden>
                 <p><?php esc_html_e( 'If your download has not started, please use the link below.', 'wp-filetrace' ); ?></p>
-                <a class="wft-download-retry-button" id="wft-download-retry-link" href="<?php echo esc_url( $retry_url ); ?>">
+                <a class="wft-download-retry-button" id="wft-download-retry-link" href="<?php echo esc_url( $manual_url ); ?>">
                     <?php
                     echo esc_html(
                         sprintf(
@@ -289,7 +352,7 @@ final class WFT_Download_Page {
             <noscript>
                 <div class="wft-download-retry is-visible">
                     <p><?php esc_html_e( 'JavaScript is disabled. Use the link below to continue your download.', 'wp-filetrace' ); ?></p>
-                    <a class="wft-download-retry-button" href="<?php echo esc_url( $retry_url ); ?>">
+                    <a class="wft-download-retry-button" href="<?php echo esc_url( $manual_url ); ?>">
                         <?php esc_html_e( 'Continue Download', 'wp-filetrace' ); ?>
                     </a>
                 </div>
@@ -301,16 +364,15 @@ final class WFT_Download_Page {
         </div>
     </main>
 
-    <?php if ( ! $preview ) : ?>
-        <?php wp_footer(); ?>
-    <?php endif; ?>
-
     <script>
     (function () {
         'use strict';
 
         var isPreview = <?php echo $preview ? 'true' : 'false'; ?>;
-        var retryUrl = <?php echo wp_json_encode( $retry_url ); ?>;
+        var fileUrl = <?php echo wp_json_encode( $manual_url ); ?>;
+        var trackUrl = <?php echo wp_json_encode( $track_url ); ?>;
+        var trackToken = <?php echo wp_json_encode( $track_token ); ?>;
+        var downloadSource = <?php echo wp_json_encode( (string) $context['download_source'] ); ?>;
         var retryBox = document.getElementById('wft-download-retry');
         var retryLink = document.getElementById('wft-download-retry-link');
         var spinners = document.querySelectorAll('.wft-download-spinner');
@@ -332,6 +394,42 @@ final class WFT_Download_Page {
             });
         }
 
+        function continueToDownload() {
+            if (started || !fileUrl) {
+                return;
+            }
+
+            started = true;
+            window.location.assign(fileUrl);
+        }
+
+        function confirmBrowserDownload() {
+            if (!trackUrl || !trackToken || typeof window.fetch !== 'function') {
+                return;
+            }
+
+            var body = 'token=' + encodeURIComponent(trackToken)
+                + '&source=' + encodeURIComponent(downloadSource || 'external');
+
+            try {
+                window.fetch(trackUrl, {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    cache: 'no-store',
+                    keepalive: true,
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
+                        'X-WP-FileTrace': 'browser'
+                    },
+                    body: body
+                }).catch(function () {
+                    // Tracking is best-effort. Never block the actual download.
+                });
+            } catch (error) {
+                // Tracking is best-effort. Never block the actual download.
+            }
+        }
+
         if (retryLink && isPreview) {
             retryLink.addEventListener('click', function (event) {
                 event.preventDefault();
@@ -345,13 +443,10 @@ final class WFT_Download_Page {
             return;
         }
 
-        function continueToDownload() {
-            if (started || !retryUrl) {
-                return;
-            }
-            started = true;
-            window.location.assign(retryUrl);
-        }
+        // The initial GET is deliberately untracked. Wait briefly before the
+        // confirmation POST so short-lived link scanners that execute only a
+        // little JavaScript still fall away before WP FileTrace records a hit.
+        window.setTimeout(confirmBrowserDownload, <?php echo (int) self::TRACK_CONFIRM_DELAY_MS; ?>);
 
         var hasAnalyticsEvent = <?php echo '' !== trim( $event_javascript ) ? 'true' : 'false'; ?>;
 
@@ -364,7 +459,7 @@ final class WFT_Download_Page {
         var downloadIdParameter = <?php echo wp_json_encode( isset( $analytics['id_parameter'] ) ? (string) $analytics['id_parameter'] : '' ); ?>;
         var fileName = <?php echo wp_json_encode( isset( $analytics['file_name'] ) ? (string) $analytics['file_name'] : '' ); ?>;
         var fileParameter = <?php echo wp_json_encode( isset( $analytics['filename_parameter'] ) ? (string) $analytics['filename_parameter'] : '' ); ?>;
-        var downloadSource = <?php echo wp_json_encode( isset( $analytics['source'] ) ? (string) $analytics['source'] : (string) $context['download_source'] ); ?>;
+        var analyticsSource = <?php echo wp_json_encode( isset( $analytics['source'] ) ? (string) $analytics['source'] : (string) $context['download_source'] ); ?>;
         var sourceParameter = <?php echo wp_json_encode( isset( $analytics['source_parameter'] ) ? (string) $analytics['source_parameter'] : '' ); ?>;
         var viaPageId = <?php echo wp_json_encode( isset( $analytics['via_page_id'] ) ? (int) $analytics['via_page_id'] : (int) $context['via_page_id'] ); ?>;
         var viaPageIdParameter = <?php echo wp_json_encode( isset( $analytics['via_page_id_parameter'] ) ? (string) $analytics['via_page_id_parameter'] : '' ); ?>;
@@ -396,19 +491,15 @@ final class WFT_Download_Page {
                     if (downloadIdParameter) {
                         eventParams[downloadIdParameter] = downloadId;
                     }
-
                     if (fileParameter) {
                         eventParams[fileParameter] = fileName;
                     }
-
                     if (sourceParameter) {
-                        eventParams[sourceParameter] = downloadSource;
+                        eventParams[sourceParameter] = analyticsSource;
                     }
-
                     if (viaPageIdParameter) {
                         eventParams[viaPageIdParameter] = viaPageId;
                     }
-
                     if (viaPageTitleParameter) {
                         eventParams[viaPageTitleParameter] = viaPageTitle;
                     }
@@ -437,10 +528,18 @@ final class WFT_Download_Page {
         <?php
     }
 
+    private static function send_public_handoff_headers(): void {
+        header( 'Cache-Control: public, max-age=60, s-maxage=300, stale-while-revalidate=30', true );
+        header( 'Content-Type: text/html; charset=' . get_option( 'blog_charset', 'UTF-8' ), true );
+        header( 'X-Robots-Tag: noindex, nofollow, noarchive', true );
+        header( 'X-WP-FileTrace-Handoff: 1', true );
+    }
+
     private static function replace_tokens( string $html, array $context ): string {
         $tokens = array(
             '{{download_name}}'   => esc_html( (string) $context['download_name'] ),
             '{{file_name}}'       => esc_html( (string) $context['file_name'] ),
+            // Preserves v0.1.13 behavior for existing custom templates.
             '{{download_url}}'    => esc_url( (string) $context['download_url'] ),
             '{{download_source}}' => esc_html( (string) $context['download_source'] ),
             '{{via_page_id}}'     => esc_html( (string) $context['via_page_id'] ),
